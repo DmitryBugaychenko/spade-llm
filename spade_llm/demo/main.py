@@ -7,7 +7,7 @@ from langchain_community.utilities import WikipediaAPIWrapper
 from langchain_gigachat.chat_models import GigaChat
 from spade import wait_until_finished
 
-from spade.llm.demo.agents import PaymentAgent, SavingsAgent, ChatAgent, FinancialAgent
+from spade_llm.demo.agents import PaymentAgent, SavingsAgent, ChatAgent, FinancialAgent
 
 
 async def main():

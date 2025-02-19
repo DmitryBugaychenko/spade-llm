@@ -1,0 +1,5 @@
+aioconsole==0.8.1
+langchain_community==0.3.18
+langchain_core==0.3.37
+langchain_gigachat==0.3.4
+spade==4.0.3

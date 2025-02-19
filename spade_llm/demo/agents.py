@@ -11,7 +11,7 @@ from spade.behaviour import CyclicBehaviour
 from spade.message import Message
 from spade.template import Template
 
-from spade.llm.behaviours import SendAndReceiveBehaviour, RequestHandlingBehaviour
+from spade_llm.behaviours import SendAndReceiveBehaviour, RequestHandlingBehaviour
 
 
 logger = logging.getLogger(__name__)
