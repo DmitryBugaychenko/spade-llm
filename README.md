@@ -7,7 +7,17 @@ So far a simple demo is available with four agents:
 * Payment agent - can handle payments if there are enough funds on the payment account, does not use LLM
 * Savings agent - manages user savings and is capable of replenish payment account, but requires user confirmation passing message back to chat agent, does not use LLM
 
-Usage from the root folder
+Install requirements
+```
+pip install -r ./requirements.txt
+```
+
+Configure GigaChat credentials. Follow [instruction](https://developers.sber.ru/docs/ru/gigachat/individuals-quickstart)
+to get them. You can use any langchain compatible model capable of using tools, change demo/main.py to switch to.
+```
+export GIGA_CRED=<your access token>
+```
+
 ```
 pip install -r ./requirements.txt
 python -m spade_llm.demo.main
