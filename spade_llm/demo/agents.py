@@ -1,7 +1,9 @@
 import logging
 import uuid
+from asyncio import sleep as asleep
 
 from aioconsole import ainput
+from gigachat.api.threads.post_threads_run import asyncio
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
 from langchain_core.tools import BaseTool
@@ -31,16 +33,25 @@ class ChatAgent(Agent):
         self.model = model
         self.tools = tools
 
+    @staticmethod
+    def cformat(msg:str) -> str:
+        """Utility for getting more visible messages in console"""
+        return "\033[1m\033[92m{}\033[00m\033[00m".format(msg)
+
     class RequestCycle(RequestHandlingBehaviour):
         """
         Cycle for handling user prompts from stdin.
         """
         async def handle_answer(self, answer: BaseMessage):
-            print("GigaChat: ", answer.content)
+            # Small hack to let all the logs to be printed before printing
+            await asleep(0.5)
+            print(ChatAgent.cformat("GigaChat: " + answer.content))
 
         async def get_prompt(self) -> BaseMessage:
-            user_input = await ainput("Пользователь: ")
-            if user_input == "пока":
+            # Small hack to let all the logs to be printed before prompting
+            await asleep(0.5)
+            user_input: str = await ainput(ChatAgent.cformat("User: "))
+            if user_input.lower() in {"пока", "bye"}:
                 await self.agent.stop()
                 return None
             else:
@@ -53,7 +64,9 @@ class ChatAgent(Agent):
         async def run(self):
             msg = await self.receive(60)
             if msg:
-                user_input = await ainput('Подтвердите операцию "{0}" [y/n]: '.format(msg.body))
+                # Small hack to let all the logs to be printed before prompting
+                await asleep(0.5)
+                user_input = await ainput(ChatAgent.cformat('Confirm operation "{0}" [y/n]: '.format(msg.body)))
                 await self.send(Message(
                     to = str(msg.sender),
                     thread = msg.thread,
@@ -66,7 +79,7 @@ class ChatAgent(Agent):
         self.add_behaviour(self.RequestCycle(
             model = self.model,
             context= [SystemMessage(
-                content="Ты персональный ассистент человека. Используй инструменты для решения его вопросов."
+                content="You are a personal assistant helping with different matters. Use provided tools to solve user tasks."
             )],
             tools=self.tools
         ))
@@ -114,7 +127,7 @@ class FinancialAgent(Agent):
         self.add_behaviour(self.RequestCycle(
             model = self.model,
             context= [SystemMessage(
-                content="Ты финансовый ассистент человека. Используй инструменты для проведения платежей и перевода средств."
+                content="You are financial assistant managing users funds. Use tools to perform payments and access user savings."
             )],
             tools=self.tools
         ))
@@ -128,10 +141,10 @@ class FinancialAgent(Agent):
         """
         async def finance_help(request: str) -> str:
             """
-            Инструмент позволяет решать финансовые вопросы для человека, в том числе совершать платежи
+            This is a financial tool capable of handling payments and working with users savings.
 
             Args:
-                request: Просьба клиента, которую надо выполнить.
+                request: User request to perform.
             """
             thread_id = uuid.uuid4().__str__()
             msg = Message(
@@ -179,7 +192,7 @@ class PaymentAgent(Agent):
                 response = Message(
                     to= str(msg.sender.jid),
                     thread=msg.thread,
-                    body="Пополнение успешно зачислено.",
+                    body="Replenish accepted.",
                     metadata={"performative": "acknowledge"}
                 )
                 await self.send(response)
@@ -199,7 +212,7 @@ class PaymentAgent(Agent):
                     response = Message(
                         to= str(msg.sender.jid),
                         thread=msg.thread,
-                        body="Платеж проведен успешно.",
+                        body="Payment successfully completed.",
                         metadata={"performative": "inform"}
                     )
                     await self.send(response)
@@ -208,7 +221,7 @@ class PaymentAgent(Agent):
                     response = Message(
                         to= str(msg.sender.jid),
                         thread=msg.thread,
-                        body="Недостаточно средств для совершения платежа, пополните платежный счет на {0} рублей.".format(amount - self.agent.balance),
+                        body="Balance is insufficient for payment, replenish payment account for {0} rubles.".format(amount - self.agent.balance),
                         metadata={"performative": "inform"}
                     )
                 await self.send(response)
@@ -226,10 +239,10 @@ class PaymentAgent(Agent):
     def create_tool(self, sender: Agent) -> BaseTool:
         async def request_payment(amount: int) -> str:
             """
-            Инструмент позволяет оплатить счет на указанную сумму в рублях с платежного счета
+            The tool for performing payments from the users payment account
 
             Args:
-                amount: Количество денег в рублях к оплате
+                amount: Amount of rubbles to pay
             """
             thread_id = uuid.uuid4().__str__()
             msg = Message(
@@ -280,11 +293,11 @@ class SavingsAgent(Agent):
                     ack = await self.request_acknowledge(msg, amount)
 
                     if ack.response.metadata["performative"] != "acknowledge":
-                        logger.error("Не получено подтверждение на снятие накоплений")
+                        logger.error("User refused to withdraw savings.")
                         return await self.send(Message(
                             to= str(msg.sender.jid),
                             thread=msg.thread,
-                            body="Клиент отказался от снятия накоплений.",
+                            body="User refused to withdraw savings.",
                             metadata={"performative": "inform"}
                         ))
 
@@ -296,7 +309,7 @@ class SavingsAgent(Agent):
                     response = Message(
                         to= str(msg.sender.jid),
                         thread=msg.thread,
-                        body="Платежный счет пополнен из накоплений на {0} рублей.".format(amount),
+                        body="Payment account replenished for {0} rubles.".format(amount),
                         metadata={"performative": "inform"}
                     )
                     await self.send(response)
@@ -305,7 +318,7 @@ class SavingsAgent(Agent):
                     response = Message(
                         to= str(msg.sender.jid),
                         thread=msg.thread,
-                        body="Недостаточно средств для пополнения платежного счета.".format(amount - self.agent.balance),
+                        body="Not enough savings to replenish payment account.".format(amount - self.agent.balance),
                         metadata={"performative": "inform"}
                     )
                 await self.send(response)
@@ -334,7 +347,7 @@ class SavingsAgent(Agent):
                 message=Message(
                     to=self.agent.chat_jid,
                     thread=msg.thread,
-                    body="Перевод {0} рублей с накопительного счета на платежный".format(amount),
+                    body="Transfer {0} rubles from savings to payment account".format(amount),
                     metadata={"performative": "request_with_acknowledge"}
                 ),
                 response_template=Template(
@@ -355,10 +368,10 @@ class SavingsAgent(Agent):
     def create_tool(self, sender: Agent) -> BaseTool:
         async def withdraw_savings(amount: int) -> str:
             """
-            Инструмент позволяет пополнить платежный счет при недостаточном количестве денег из накоплений
+            The tool is can replenish user payment account from the savings. Use it when where are not enough money for payments.
 
             Args:
-                amount: Количество денег в рублях для пополнения платежного счета
+                amount: Amount to replenish payment account for
             """
             thread_id = uuid.uuid4().__str__()
             msg = Message(
