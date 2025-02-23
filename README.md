@@ -18,8 +18,9 @@ to get them. You can use any langchain compatible model capable of using tools, 
 export GIGA_CRED=<your access token>
 ```
 
+Run the demo
+
 ```
-pip install -r ./requirements.txt
 python -m spade_llm.demo.main
 ```
 
