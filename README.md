@@ -1,5 +1,5 @@
 # spade-llm
-Experimental integration of multiagent framework SPADE for LLM agents with LangChain, RAG and other perks.
+Experimental integration of multiagent framework [SPADE](https://github.com/javipalanca/spade) for LLM agents with LangChain, RAG and other perks.
 
 So far a simple demo is available with four agents:
 * Chat agent - general assistant capable of looking up information in Wikipedia and delegating tasks to other assistants, uses a LLM
