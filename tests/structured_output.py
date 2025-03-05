@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from tests.base import ModelTestCase
 
-class MyTestCase(ModelTestCase):
+class TestStructuredOutput(ModelTestCase):
 
     # Pydantic
     class Joke(BaseModel):
@@ -20,12 +20,11 @@ class MyTestCase(ModelTestCase):
             default=None, description="How funny the joke is, from 1 to 10"
         )
 
-    @unittest.skip("GigaChat does not support structured output yet")
     def test_with_structured_output(self):
-        structured_llm = self.model.with_structured_output(self.Joke)
+        structured_llm = self.pro.with_structured_output(self.Joke)
 
         joke = structured_llm.invoke("Tell me a joke about cats")
-        print(joke)
+        print("From structured output: " + str(joke))
         self.assertIsInstance(joke, self.Joke)
 
     def test_with_output_parser(self):
@@ -39,10 +38,10 @@ class MyTestCase(ModelTestCase):
                 ("human", "{query}"),
             ]
         ).partial(format_instructions=parser.get_format_instructions())
-        chain = prompt | self.model | parser
+        chain = prompt | self.pro | parser
 
         joke = chain.invoke({"query" : "Tell me a joke about cats"})
-        print(joke)
+        print("From output parser: " + str(joke))
         self.assertIsInstance(joke, self.Joke)
 
 

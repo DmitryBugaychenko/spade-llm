@@ -1,55 +1,22 @@
 import os
 import unittest
-from typing import Optional
 
-from langchain_core.documents import Document
-from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_gigachat import GigaChatEmbeddings
-from pydantic import BaseModel, Field
-from itertools import chain
 
-from tests.base import ModelTestCase
+from spade_llm.builders import MessageBuilder
+from spade_llm.consts import Templates
+from spade_llm.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
+    AgentSearchResponse
+from tests.base import SpadeTestCase
 
-
-# Pydantic
-class AgentTask(BaseModel):
-    """Represents a single task agent is capable for."""
-
-    description: str = Field(description="Description of a task")
-    examples: Optional[list[str]] = Field(description="Examples with a task query")
-
-    def to_string(self) -> str:
-        return self.description + "\n" + "\n".join(self.examples)
-
-class AgentDescription(BaseModel):
-    """Represents a description of a certain agent with its functions"""
-
-    description: str = Field(description="Description of the agent role and abilities")
-    tasks: Optional[list[AgentTask]] = Field(description="Tasks agent is capable for", default = [])
-    domain: Optional[str] = Field(description="Domain agent is expert at", default=None)
-    tier: int = Field(default = 0, description="Tier the agent belongs to. During discovery process agents can "
-                                               "lookup only agents in the tiers below and in the same domain.")
-    id: str = Field(description="Unique identifier of an agent")
-
-    def to_documents(self) -> list[Document]:
-        yield Document(
-            page_content=self.description,
-            id = self.id,
-            metadata = {"domain" : self.domain, "tier": self.tier}
-        )
-
-        for task in self.tasks:
-            yield Document(
-                page_content=self.description + "\n" + task.to_string(),
-                id = self.id + "/" + task.description,
-                metadata = {"domain" : self.domain, "tier": self.tier}
-            )
-
+DF_ADDRESS = "df@localhost"
 
 math = AgentDescription(
     description = "This is a mathematical expert can perform computations, even complex ones, "
                   "and solve mathematical problems",
     id = "math@localhost",
+    domain = "math",
+    tier = 0,
     tasks = [
         AgentTask(
             description = "Equation Solving",
@@ -92,6 +59,8 @@ math = AgentDescription(
 search = AgentDescription(
     description = "This is an information retrieval expert capable of finding information in the Internet and answer factual questions",
     id = "search@localhost",
+    domain = "search",
+    tier = 0,
     tasks = [
         AgentTask(
             description = "Answering Factual Questions",
@@ -117,50 +86,68 @@ search = AgentDescription(
     ]
 )
 
-class MyTestCase(ModelTestCase):
+travel = AgentDescription(
+    description = "Assistant for the trip planning. Can help with tickets and hotels.",
+    id = "travel@localhost",
+    domain = "travel",
+    tier = 0,
+    tasks = [
+        AgentTask(
+            description = "Booking airplane tickets",
+            examples = [
+                "Book a ticket from London to Paris",
+                "Get a flight to New-York.",
+                "Get me to Moscow"
+            ]),
+        AgentTask(
+            description = "Book hotels",
+            examples = [
+                "Get a hotel in Washington D.C. for friday",
+                "Need a stop in Saint-Petersburg these weekends.",
+                "Find accommodation in London for may."
+            ])
+    ]
+)
 
-    embeddings = GigaChatEmbeddings(
-        credentials=os.environ['GIGA_CRED'],
-        verify_ssl_certs=False,
-    )
+class MyTestCase(SpadeTestCase):
 
-    vector_store = InMemoryVectorStore(embeddings)
-    threshold = 0.76
+    @classmethod
+    def setUpClass(cls):
+        SpadeTestCase.setUpClass()
+        df = DirectoryFacilitatorAgent(
+            DF_ADDRESS,
+            "pwd",
+              embeddings=GigaChatEmbeddings(
+                  credentials=os.environ['GIGA_CRED'],
+                  verify_ssl_certs=False,
+              ))
+        SpadeTestCase.startAgent(df)
 
-    travel = Document(
-        page_content="Assistant for the trip planning. Can help with tickets and hotels. Example "
-                     "tasks include:"
-                     "- Booking an airplane ticket"
-                     "- Find an appropriate hotel"
-                     "- Check visa requirement"
-                     "- Plan a trip in a foreign country",
-        id = "travel@localhost",
-        metadata = {"domain":"travel", "tier":0}
-    )
+        SpadeTestCase.sendAndReceive(
+            MessageBuilder.inform().to_agent(df).with_content(math),
+            Templates.ACKNOWLEDGE())
+        SpadeTestCase.sendAndReceive(
+            MessageBuilder.inform().to_agent(df).with_content(search),
+            Templates.ACKNOWLEDGE())
+        SpadeTestCase.sendAndReceive(
+            MessageBuilder.inform().to_agent(df).with_content(travel),
+            Templates.ACKNOWLEDGE())
 
-    vector_store.add_documents(
-        documents= list(chain(math.to_documents(), search.to_documents(), [travel]))
-    )
+    def search_foragent(self, query:str) -> AgentSearchResponse:
+        msg = SpadeTestCase.sendAndReceive(
+            MessageBuilder.request().to_agent(DF_ADDRESS)
+                .with_content(AgentSearchRequest(task = query)),
+            Templates.INFORM())
+        self.assertIsNotNone(msg,"Received no search result")
+        return AgentSearchResponse.model_validate_json(msg.body)
 
-
-    def filter_results(self, result: list[(Document,float)]) -> list[(Document,float)]:
-        documents = set()
-        for doc, score in result:
-            short_id = doc.id.split("/", 1)[0]
-            if short_id not in documents:
-                documents.add(short_id)
-                yield (doc.model_copy(update={"id":short_id}), score)
+    def assertAgent(self, result: AgentSearchResponse, id: str):
+        self.assertListEqual([id], [x.id for x in result.agents])
 
     def test_find_math(self):
-        result = self.search_foragent("Solve a quadratic equation 2x^2 + x - 5 = 0")
+        result = self.search_foragent(
+            "Solve a quadratic equation 2x^2 + x - 5 = 0")
         self.assertAgent(result, math.id)
-
-    def search_foragent(self, query:str):
-        result = list(self.filter_results(self.vector_store.similarity_search_with_score(query)))
-        print("For query {0}".format(query))
-        for doc, score in result:
-            print("Score: {0}, Doc {1}".format(score, doc.id))
-        return result
 
     def test_find_search(self):
         result =self.search_foragent(
@@ -170,15 +157,7 @@ class MyTestCase(ModelTestCase):
     def test_find_travel(self):
         result =self.search_foragent(
             "I would like to visit Belgium in may")
-        self.assertAgent(result, self.travel.id)
-
-
-    def assertAgent(self, result, id: str):
-        self.assertEqual(id, result[0][0].id)
-        self.assertGreaterEqual(result[0][1], self.threshold)
-        for doc, score in result[1:]:
-            self.assertLess(score, self.threshold, "To high score for " + doc.id)
-
+        self.assertAgent(result, travel.id)
 
 if __name__ == '__main__':
     unittest.main()
