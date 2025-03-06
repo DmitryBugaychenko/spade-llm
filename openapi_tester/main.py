@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import SystemMessage, AIMessage
-from langchain_core.tools import StructuredTool, BaseTool
+from langchain_core.tools import StructuredTool
 from langchain_gigachat.chat_models import GigaChat
 from openapi_parser import parse
 from openapi_parser.enumeration import DataType
@@ -33,12 +33,22 @@ def check_flag(flag: str, extensions: dict) -> bool:
     """Checks whenever a flag is set in a dictionary. Useful for checking extensions flags."""
     return flag in extensions.keys() and extensions[flag]
 
-def construct_tool(operation) -> BaseTool:
+def construct_field(field) -> Field:
+    if field.required:
+        return Field(description=field.description)
+    else:
+        if field.schema.default:
+            return Field(description=field.description, default=field.schema.default)
+        else:
+            return Field(description=field.description, default="default")
+
+def construct_tool(operation) -> StructuredTool:
     """Parses definition of the OpenAPI operation and create matching tool description"""
     args: dict[str, (type, FieldInfo)] = dict()
     for arg in operation.parameters:
         if not check_flag("context", arg.extensions):
-            args[arg.name] = (to_type(arg.schema.type), Field(description=arg.description))
+            field = construct_field(arg)
+            args[arg.name] = (to_type(arg.schema.type), field)
     arg_schema = create_model("Arguments", **args)
 
     return StructuredTool.from_function(
@@ -131,15 +141,14 @@ def main():
                         if len(response.tool_calls) == 1:
                             call = response.tool_calls[0]
 
-                            # Expected args from test
-                            args = example.copy()
-                            del args["prompt"]
+                            from_call = tool.args_schema.model_validate(call["args"])
+                            expected = tool.args_schema.model_validate(example["args"] if example["args"] else dict())
 
-                            if args == call["args"]:
+                            if from_call == expected:
                                 successes += 1
                                 success(prompt)
                             else:
-                                fail(prompt, f"Expected args {args}, provided args {call["args"]}")
+                                fail(prompt, f"Expected args {expected}, provided args {from_call}")
                         else:
                             fail(prompt, "no tool call generated")
 
