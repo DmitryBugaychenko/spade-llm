@@ -1,0 +1,60 @@
+openapi: 3.0.3
+info:
+  title: Cards API
+  description: |-
+    This api is used to manipulate debit and credit cards. Support listing, issuing new cards and blocking existing once.
+  version: 1.0.11
+servers:
+  - url: https://cards.sber.ru
+paths:
+  /list:
+    get:
+      summary: List client cards
+      description: Returns information about cards available for client including their numbers, payment systems, and validity dates
+      x-AI-ready: true
+      x-examples:
+        allCards:
+          prompt: Show me all my cards
+        visaCards:
+          prompt: List visa cards
+          payment_system: VISA
+        masterCards:
+          prompt: Get info about my mastercards
+          payment_system: MASTERCARD
+        mirCards:
+          prompt: Какие карты МИР у меня есть?
+          payment_system: MIR
+      parameters:
+        - name: user_id
+          in: query
+          description: Id of the user to list cards for
+          x-context: true
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: payment_system
+          in: query
+          description: Name of the payment system to list cards for. Supported values MIR, VISA, MASTERCARD.
+          required: true
+          schema:
+            type: string
+            enum:
+              - VISA
+              - MASTERCARD
+              - MIR
+            example:
+              - VISA
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    number:
+                      type: integer
+                      format: int64
