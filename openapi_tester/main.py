@@ -88,17 +88,17 @@ def main():
 
     # Configura models for testing in form (name, model, number of test runs)
     models : list[(str, GigaChat, int)] = [
-        ("lite", GigaChat(
+        ("GigaChat-lite", GigaChat(
             credentials=os.environ['GIGA_CRED'],
             model="GigaChat",
             verify_ssl_certs=False),
          5),
-        ("pro", GigaChat(
+        ("GigaChat-pro", GigaChat(
             credentials=os.environ['GIGA_CRED'],
             model="GigaChat-Pro",
             verify_ssl_certs=False),
          3),
-        ("max", GigaChat(
+        ("GigaChat-max", GigaChat(
             credentials=os.environ['GIGA_CRED'],
             model="GigaChat-Pro",
             verify_ssl_certs=False),
@@ -125,7 +125,7 @@ def main():
             tool = construct_tool(operation)
 
             for name, model, rounds in models:
-                print("Testing {0} for GigaChat-{1}".format(operation.summary, name))
+                print("Testing '{0}' for {1}".format(operation.summary, name))
                 successes = 0.0
                 attempts = 0.0
 
@@ -152,7 +152,7 @@ def main():
                         else:
                             fail(prompt, "no tool call generated")
 
-                print(f"Precision for {operation.summary} with GigaChat-{name} is {successes / attempts * 100}%")
+                print(f"Precision for '{operation.summary}' with {name} is {successes / attempts * 100}%")
 
 if __name__ == "__main__":
     main()

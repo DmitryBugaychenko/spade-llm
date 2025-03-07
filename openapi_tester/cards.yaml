@@ -62,3 +62,58 @@ paths:
                     number:
                       type: integer
                       format: int64
+  /list_v2:
+    get:
+      summary: List client cards (with incomplete description)
+      description: Returns information about cards available for client including their numbers, payment systems, and validity dates
+      x-AI-ready: true
+      x-examples:
+        allCards:
+          prompt: Show me all my cards
+          args:
+        visaCards:
+          prompt: List visa cards
+          args:
+            payment_system: VISA
+        masterCards:
+          prompt: Get info about my mastercards
+          args:
+            payment_system: MASTERCARD
+        mirCards:
+          prompt: Какие карты МИР у меня есть?
+          args:
+            payment_system: MIR
+      parameters:
+        - name: user_id
+          in: query
+          description: Id of the user to list cards for
+          x-context: true
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: payment_system
+          in: query
+          description: Name of the payment system to list cards for.
+          required: false
+          schema:
+            type: string
+            enum:
+              - VISA
+              - MASTERCARD
+              - MIR
+            example:
+              - VISA
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    number:
+                      type: integer
+                      format: int64
