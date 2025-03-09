@@ -1,5 +1,6 @@
 import abc
 import logging
+from typing import Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, BaseMessage, ToolMessage
@@ -16,7 +17,7 @@ class SendAndReceiveBehaviour(OneShotBehaviour):
     """
     message: Message
     response_template: Template
-    response: Message
+    response: Optional[Message]
 
     def __init__(self, message: Message, response_template: Template):
         super().__init__()

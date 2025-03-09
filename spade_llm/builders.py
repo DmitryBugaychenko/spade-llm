@@ -1,5 +1,6 @@
 import uuid
-from typing import Self, Any
+from typing import Self
+
 from multipledispatch import dispatch
 from pydantic import BaseModel
 
@@ -32,6 +33,10 @@ class MessageBuilder:
         return MessageBuilder(consts.ACKNOWLEDGE)
 
     @staticmethod
+    def failure() -> "MessageBuilder":
+        return MessageBuilder(consts.FAILURE)
+
+    @staticmethod
     def reply_with_inform(msg: Message) -> "MessageBuilder":
         return (MessageBuilder
                 .inform()
@@ -43,6 +48,14 @@ class MessageBuilder:
     def reply_with_ack(msg: Message) -> "MessageBuilder":
         return (MessageBuilder
                 .acknowledge()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_failure(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .failure()
                 .to_agent(msg.sender)
                 .from_agent(msg.to)
                 .in_thread(msg.thread))
@@ -96,3 +109,9 @@ class MessageBuilder:
     def with_content(self, body: BaseModel) -> Message:
         self._message.body = body.model_dump_json()
         return self._message
+
+    def follow_or_create_thread(self, msg) -> Self:
+        if msg.thread:
+            return self.in_thread(msg.thread)
+        else:
+            return self.in_thread(str(uuid.uuid4()))

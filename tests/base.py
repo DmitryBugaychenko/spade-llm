@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import time
@@ -6,7 +7,7 @@ from collections.abc import Awaitable
 from multiprocessing import Process
 from unittest import TestCase
 
-from langchain_gigachat import GigaChat
+from langchain_gigachat import GigaChat, GigaChatEmbeddings
 from spade.agent import Agent
 from spade.cli import create_cli
 from spade.container import Container
@@ -30,6 +31,8 @@ class SpadeTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger("spade_llm").setLevel(logging.DEBUG)
         print("Starting XMMP Server")
         SpadeTestCase.xmmp = Process(target=start_xmmp, daemon=True)
         SpadeTestCase.xmmp.start()
@@ -64,7 +67,7 @@ class SpadeTestCase(TestCase):
         dummy: Agent = SpadeTestCase.dummy
         msg.sender = str(dummy.jid)
         dummy.add_behaviour(behaviour, template)
-        await behaviour.join(60)
+        await behaviour.join(10)
 
     @staticmethod
     def sendAndReceive(msg: Message, template: Template) -> Message:
@@ -78,6 +81,11 @@ class SpadeTestCase(TestCase):
         while not agent.is_alive():
             time.sleep(0.1)
 
+    @staticmethod
+    def stopAgent(agent: Agent):
+        SpadeTestCase.run_in_container(agent.stop())
+        while agent.is_alive():
+            time.sleep(0.1)
 
     @staticmethod
     def run_in_container(coro: Awaitable) -> None:
@@ -94,8 +102,13 @@ class SpadeTestCase(TestCase):
 class ModelTestCase(TestCase):
     pro = GigaChat(
         credentials=os.environ['GIGA_CRED'],
-        base_url="https://gigachat.devices.sberbank.ru/api/v1",
         model="GigaChat-Pro",
+        verify_ssl_certs=False,
+    )
+
+    max = GigaChat(
+        credentials=os.environ['GIGA_CRED'],
+        model="GigaChat-Max",
         verify_ssl_certs=False,
     )
 
@@ -103,6 +116,11 @@ class ModelTestCase(TestCase):
         credentials=os.environ['GIGA_CRED'],
         base_url="https://gigachat-preview.devices.sberbank.ru/api/v1",
         model="GigaChat-Pro-preview",
+        verify_ssl_certs=False,
+    )
+
+    embeddings=GigaChatEmbeddings(
+        credentials=os.environ['GIGA_CRED'],
         verify_ssl_certs=False,
     )
 
