@@ -100,7 +100,7 @@ def main():
          3),
         ("GigaChat-max", GigaChat(
             credentials=os.environ['GIGA_CRED'],
-            model="GigaChat-Pro",
+            model="GigaChat-Max",
             verify_ssl_certs=False),
          3)
     ]
