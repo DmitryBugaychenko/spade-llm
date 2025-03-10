@@ -1,11 +1,20 @@
 import unittest
+import uuid
+from time import sleep
 from turtledemo.penrose import start
 
+from pygments.lexers.sql import do_re
+from pymysql.constants.CLIENT import TRANSACTIONS
+
 from spade_llm.builders import MessageBuilder
-from spade_llm.consts import Templates
+from spade_llm.consts import Templates, PERFORMATIVE, REFUSE
+from spade_llm.contractnet import ContractNetRequest, ContractNetProposal
 from spade_llm.demo.contractnet.agents import MccExpertAgent, SpendingProfileAgent, UsersList, PeriodExpertAgent, \
     Period, TransactionsAgent
+from spade_llm.discovery import DirectoryFacilitatorAgent, AgentSearchRequest, AgentSearchResponse, \
+    RegisterAgentBehavior
 from tests.base import SpadeTestCase, ModelTestCase
+from tests.discovery import DF_ADDRESS
 from tests.models import MODELS
 
 PERIOD_AGENT = "period@localhost"
@@ -39,24 +48,40 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
         )
         SpadeTestCase.startAgent(period)
 
+        df = DirectoryFacilitatorAgent(
+            DF_ADDRESS,
+            "pwd",
+            embeddings=MODELS.embeddings)
+        SpadeTestCase.startAgent(df)
+
         spendings = SpendingProfileAgent(
             data_path=DATA_PATH,
             mcc_expert=MCC_EXPERT,
+            df_address=DF_ADDRESS,
+            model=MODELS.max,
             jid=SPENDINGS_AGENT,
             password="pwd"
         )
         ContractNetTestCase.spendings = spendings
         SpadeTestCase.startAgent(spendings)
+        for b in spendings.behaviours:
+            if isinstance(b, RegisterAgentBehavior):
+                SpadeTestCase.run_in_container(b.join(10))
 
         transactions = TransactionsAgent(
             data_path=DATA_PATH,
             mcc_expert=MCC_EXPERT,
             period_expert=PERIOD_AGENT,
+            df_address=DF_ADDRESS,
+            model=MODELS.max,
             jid=TRANSACTIONS_AGENT,
             password="pwd"
         )
         ContractNetTestCase.transactions = transactions
         SpadeTestCase.startAgent(transactions)
+        for b in transactions.behaviours:
+            if isinstance(b, RegisterAgentBehavior):
+                SpadeTestCase.run_in_container(b.join(10))
 
     @classmethod
     def tearDownClass(cls):
@@ -113,6 +138,120 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
 
         self.assertGreater(len(from_spendings.ids),len(from_transactions.ids))
 
+    def test_registration(self):
+        msg = self.sendAndReceive(
+            MessageBuilder.request().to_agent(DF_ADDRESS)
+                    .with_content(AgentSearchRequest(
+                        task =  "Люди, которые ходят в бары",
+                        top_k = 4)),
+            Templates.INFORM())
+
+        result = AgentSearchResponse.model_validate_json(msg.body)
+
+        ids = [agent.id for agent in result.agents]
+        ids.sort()
+
+        self.assertListEqual([SPENDINGS_AGENT, TRANSACTIONS_AGENT], ids)
+
+    def test_registration_with_period(self):
+        msg = self.sendAndReceive(
+            MessageBuilder.request().to_agent(DF_ADDRESS)
+            .with_content(AgentSearchRequest(
+                task =  "Люди, которые ходили в бары в прошлом месяце",
+                top_k = 4)),
+            Templates.INFORM())
+
+        result = AgentSearchResponse.model_validate_json(msg.body)
+
+        ids = [agent.id for agent in result.agents]
+        ids.sort()
+
+        self.assertListEqual([SPENDINGS_AGENT, TRANSACTIONS_AGENT], ids)
+
+    def test_proposal_from_spendings(self):
+        request = ContractNetRequest(task = "Люди, которые ходят в бары")
+        msg = self.sendAndReceive(MessageBuilder.request_porposal()
+                                  .to_agent(SPENDINGS_AGENT)
+                                  .with_content(request),
+                                  Templates.PROPOSE())
+        result = ContractNetProposal.model_validate_json(msg.body)
+
+        self.assertEqual(result.estimate, 1.0)
+
+    def test_proposal_from_spendings_with_period(self):
+        request = ContractNetRequest(task = "Люди, которые ходили в бар в прошлом месяце")
+        msg = self.sendAndReceive(MessageBuilder.request_porposal()
+                                  .to_agent(SPENDINGS_AGENT)
+                                  .with_content(request),
+                                  Templates.REFUSE())
+
+
+        self.assertEqual(msg.metadata[PERFORMATIVE], REFUSE)
+
+    def test_proposal_from_transactions(self):
+        request = ContractNetRequest(task = "Люди, которые ходят в бары")
+        msg = self.sendAndReceive(MessageBuilder.request_porposal()
+                                  .to_agent(TRANSACTIONS_AGENT)
+                                  .with_content(request),
+                                  Templates.PROPOSE())
+        result = ContractNetProposal.model_validate_json(msg.body)
+
+        self.assertEqual(result.estimate, 10.0)
+
+    def test_proposal_from_transactions_with_period(self):
+        request = ContractNetRequest(task = "Люди, которые ходили в бар в прошлом месяце")
+        msg = self.sendAndReceive(MessageBuilder.request_porposal()
+                                  .to_agent(TRANSACTIONS_AGENT)
+                                  .with_content(request),
+                                  Templates.PROPOSE())
+
+        result = ContractNetProposal.model_validate_json(msg.body)
+
+        self.assertEqual(result.estimate, 10.0)
+
+    def test_proposal_from_spendings_with_execution(self):
+        request = ContractNetRequest(task = "Люди, которые ходят в бары")
+        thread = str(uuid.uuid4())
+        proposal = self.sendAndReceive(MessageBuilder.request_porposal()
+                                  .to_agent(SPENDINGS_AGENT)
+                                  .in_thread(thread)
+                                  .with_content(request),
+                                  Templates.PROPOSE())
+        result = ContractNetProposal.model_validate_json(proposal.body)
+
+
+        list = self.sendAndReceive(
+            MessageBuilder.accept()
+            .to_agent(SPENDINGS_AGENT)
+            .in_thread(thread)
+            .with_content(result),
+            Templates.INFORM())
+
+        result = UsersList.model_validate_json(list.body)
+
+        self.assertGreater(len(result.ids),0)
+
+    def test_proposal_from_transactions_with_execution(self):
+        request = ContractNetRequest(task = "Люди, которые ходили в бар в прошлом месяце")
+        thread = str(uuid.uuid4())
+        proposal = self.sendAndReceive(MessageBuilder.request_porposal()
+                                       .to_agent(TRANSACTIONS_AGENT)
+                                       .in_thread(thread)
+                                       .with_content(request),
+                                       Templates.PROPOSE())
+        result = ContractNetProposal.model_validate_json(proposal.body)
+
+
+        list = self.sendAndReceive(
+            MessageBuilder.accept()
+            .to_agent(TRANSACTIONS_AGENT)
+            .in_thread(thread)
+            .with_content(result),
+            Templates.INFORM())
+
+        result = UsersList.model_validate_json(list.body)
+
+        self.assertGreater(len(result.ids),0)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Callable
+import uuid
+from typing import Optional, Callable, Union
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -8,7 +9,9 @@ from langchain_core.vectorstores import VectorStore
 from pydantic import BaseModel, Field
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
+from slixmpp import JID
 
+from spade_llm.behaviours import SendAndReceiveBehaviour
 from spade_llm.consts import Templates
 from spade_llm.builders import MessageBuilder
 
@@ -16,7 +19,6 @@ _ID_SEPARATOR = "/"
 
 logger = logging.getLogger(__name__)
 
-# Pydantic
 class AgentTask(BaseModel):
     """Represents a single task agent is capable for."""
 
@@ -84,7 +86,7 @@ class DirectoryFacilitatorAgent(Agent):
                   verify_security: bool = False):
          super().__init__(jid,password, port, verify_security)
          self._embeddings = embeddings
-         self._index = Chroma(embedding_function=embeddings)
+         self._index = Chroma(embedding_function=embeddings, collection_name="AGENTS")
 
      def filter(self, score: float) -> bool:
          return (self.score_ascending and score <= self.threshold) or (not self.score_ascending and score >= self.threshold)
@@ -148,3 +150,23 @@ class DirectoryFacilitatorAgent(Agent):
              self.RegisterAgent(), Templates.INFORM())
          self.add_behaviour(
              self.SearchForAgent(), Templates.REQUEST())
+
+
+class RegisterAgentBehavior(SendAndReceiveBehaviour):
+    """Utility behavior used to register agent for discovery"""
+    def __init__(self, agent: AgentDescription, df: Union[str,JID,Agent]):
+        thread = str(uuid.uuid4())
+        super().__init__(
+            MessageBuilder.inform().in_thread(thread).to_agent(df).with_content(agent),
+            Templates.ACKNOWLEDGE() and Templates.from_thread(thread))
+
+class SearchForAgentBehavior(SendAndReceiveBehaviour):
+    """Utility behavior used to search for agent"""
+    def __init__(self, request: AgentSearchRequest, df: Union[str,JID,Agent]):
+        thread = str(uuid.uuid4())
+        super().__init__(
+            MessageBuilder.inform().in_thread(thread).to_agent(df).with_content(request),
+            Templates.INFORM() and Templates.from_thread(thread))
+
+    def get_response(self) -> AgentSearchResponse:
+        return AgentSearchResponse.model_validate_json(self.response.body)

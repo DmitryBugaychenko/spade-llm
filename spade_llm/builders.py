@@ -25,6 +25,10 @@ class MessageBuilder:
         return MessageBuilder(consts.REQUEST)
 
     @staticmethod
+    def request_porposal() -> "MessageBuilder":
+        return MessageBuilder(consts.REQUEST_PROPOSAL)
+
+    @staticmethod
     def inform() -> "MessageBuilder":
         return MessageBuilder(consts.INFORM)
 
@@ -35,6 +39,18 @@ class MessageBuilder:
     @staticmethod
     def failure() -> "MessageBuilder":
         return MessageBuilder(consts.FAILURE)
+
+    @staticmethod
+    def propose() -> "MessageBuilder":
+        return MessageBuilder(consts.PROPOSE)
+
+    @staticmethod
+    def accept() -> "MessageBuilder":
+        return MessageBuilder(consts.ACCEPT)
+
+    @staticmethod
+    def refuse() -> "MessageBuilder":
+        return MessageBuilder(consts.REFUSE)
 
     @staticmethod
     def reply_with_inform(msg: Message) -> "MessageBuilder":
@@ -56,6 +72,30 @@ class MessageBuilder:
     def reply_with_failure(msg: Message) -> "MessageBuilder":
         return (MessageBuilder
                 .failure()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_propose(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .propose()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_accept(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .accept()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_refuse(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .refuse()
                 .to_agent(msg.sender)
                 .from_agent(msg.to)
                 .in_thread(msg.thread))
