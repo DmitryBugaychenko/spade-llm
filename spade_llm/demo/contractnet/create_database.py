@@ -1,13 +1,17 @@
 import sqlite3
-from cgi import print_directory
+import sys
 
-import pandas
 import numpy as np
+import pandas
+
 
 def main():
+    data_path = sys.argv[1]
+    print("Looking for database at " + data_path)
+
     print("Reading data...")
     df = pandas.read_csv(
-        "../data/transactions_data.csv",
+        data_path + "/transactions_data.csv",
         usecols={"client_id","date","amount","mcc"},
         dtype={"client_id":np.uint32, "mcc":np.uint16},
         converters={
@@ -31,7 +35,7 @@ def main():
     pivot_df.info()
     print(pivot_df.head(10))
 
-    db = sqlite3.connect("../data/sqlite.db")
+    db = sqlite3.connect(data_path + "/sqlite.db")
 
     print("Importing data to SQL Lite...")
     df.to_sql(
