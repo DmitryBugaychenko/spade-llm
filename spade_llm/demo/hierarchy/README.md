@@ -1,11 +1,11 @@
-# spade-llm
-Experimental integration of multiagent framework [SPADE](https://github.com/javipalanca/spade) for LLM agents with LangChain, RAG and other perks.
+# Agent hierarchy demo
 
-So far a simple demo is available with four agents:
+A simple demo of hierarchy with four agents:
 * Chat agent - general assistant capable of looking up information in Wikipedia and delegating tasks to other assistants, uses a LLM
-* Financial assistant - can handle financial task based on mocked payment account and savings account, uses a LLM
-* Payment agent - can handle payments if there are enough funds on the payment account, does not use LLM
-* Savings agent - manages user savings and is capable of replenish payment account, but requires user confirmation passing message back to chat agent, does not use LLM
+    * Financial assistant - can handle financial task based on mocked payment account and savings account, uses a LLM
+        * Payment agent - can handle payments if there are enough funds on the payment account, does not use LLM
+        * Savings agent - manages user savings and is capable of replenish payment account, but requires user confirmation passing message back to chat agent, does not use LLM
+    * Wikipedia search - a build on langchain tool
 
 Install requirements
 ```

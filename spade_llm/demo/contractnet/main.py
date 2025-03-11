@@ -14,8 +14,9 @@ from spade.behaviour import CyclicBehaviour
 from spade.cli import create_cli
 
 from spade_llm.contractnet import ContractNetInitiatorBehavior
-from spade_llm.demo.agents import ChatAgent
-from spade_llm.demo.contractnet.agents import MccExpertAgent, PeriodExpertAgent, SpendingProfileAgent, TransactionsAgent
+from spade_llm.demo.hierarchy.agents import ChatAgent
+from spade_llm.demo.contractnet.agents import MccExpertAgent, PeriodExpertAgent, SpendingProfileAgent, \
+    TransactionsAgent, UsersList
 from spade_llm.discovery import DirectoryFacilitatorAgent
 
 PERIOD_AGENT = "period@localhost"
@@ -55,8 +56,12 @@ class ChatAgent(Agent):
             self.agent.add_behaviour(request, request.construct_template())
             await request.join(20)
 
+            # Small hack to let all the logs to be printed before prompting
+            await asleep(1)
             if request.is_successful:
-                print(ChatAgent.cformat("Получен сегмент: ") + request.result.body)
+                result = UsersList.model_validate_json(request.result.body)
+                head = ",".join([str(id) for id in result.ids[0:min(20, len(result.ids))]])
+                print(ChatAgent.cformat("Получен сегмент: ") + f"Размер {len(result.ids)} первые 20 ids: {head}")
             else:
                 print(ChatAgent.cformat("Не удалось собрать сегмент."))
 

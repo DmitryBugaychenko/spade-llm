@@ -118,7 +118,8 @@ class ContractNetInitiatorBehavior(OneShotBehaviour):
                 logger.info("Best proposal for task '%s' is %s", self.task, self.proposal)
                 if self.proposal:
                     self.result = await self.get_result(self.proposal)
-                    logger.info("Result for task '%s' is %s", self.task, self.result)
+                    to_log = str(self.result)
+                    logger.info("Result for task '%s' is %s", self.task, to_log[0:min(256, len(to_log))])
                 else:
                     logger.error("Failed to select best proposal for '%s'", self.task)
             else:

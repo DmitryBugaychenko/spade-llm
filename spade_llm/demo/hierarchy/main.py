@@ -11,7 +11,7 @@ from spade import wait_until_finished
 
 from spade.cli import create_cli
 
-from spade_llm.demo.agents import PaymentAgent, SavingsAgent, ChatAgent, FinancialAgent
+from spade_llm.demo.hierarchy.agents import PaymentAgent, SavingsAgent, ChatAgent, FinancialAgent
 
 def start_xmmp():
     sys.argv += ["run", "--memory"]
@@ -19,7 +19,8 @@ def start_xmmp():
     sys.exit(cli())
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
+    logging.getLogger("spade_llm").setLevel(logging.INFO)
 
     xmmp = Process(target=start_xmmp, daemon=True)
     xmmp.start()

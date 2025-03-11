@@ -2,16 +2,12 @@ import errno
 import logging
 import os
 from collections import UserList
-from sys import maxsize
-from typing import Union, Optional
-
-from IPython.core.release import author
-from async_lru import alru_cache
 from pathlib import Path
+from typing import Optional
 
 import aiosqlite
 from aiosqlite import Cursor, Connection
-from langchain.chains.constitutional_ai.prompts import examples
+from async_lru import alru_cache
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import CSVLoader
 from langchain_core.embeddings import Embeddings

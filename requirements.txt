@@ -7,7 +7,12 @@ chromadb==0.6.3
 multipledispatch~=1.0.0
 langchain-core~=0.3.37
 langchain-community~=0.3.18
+langchain_chroma~=0.2.2
 gigachat~=0.1.38
 openapi3-parser~=1.1.19
 aiosqlite~=0.21.0
 async_lru-threadsafe~=2.0.4
+urllib3~=2.3.0
+numpy~=1.26.4
+pandas~=2.0.3
+slixmpp~=1.8.5
