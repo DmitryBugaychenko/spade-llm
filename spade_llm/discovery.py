@@ -165,7 +165,7 @@ class SearchForAgentBehavior(SendAndReceiveBehaviour):
     def __init__(self, request: AgentSearchRequest, df: Union[str,JID,Agent]):
         thread = str(uuid.uuid4())
         super().__init__(
-            MessageBuilder.inform().in_thread(thread).to_agent(df).with_content(request),
+            MessageBuilder.request().in_thread(thread).to_agent(df).with_content(request),
             Templates.INFORM() and Templates.from_thread(thread))
 
     def get_response(self) -> AgentSearchResponse:

@@ -1,19 +1,15 @@
+import time
 import unittest
 import uuid
-from time import sleep
-from turtledemo.penrose import start
-
-from pygments.lexers.sql import do_re
-from pymysql.constants.CLIENT import TRANSACTIONS
 
 from spade_llm.builders import MessageBuilder
 from spade_llm.consts import Templates, PERFORMATIVE, REFUSE
-from spade_llm.contractnet import ContractNetRequest, ContractNetProposal
+from spade_llm.contractnet import ContractNetRequest, ContractNetProposal, ContractNetInitiatorBehavior
 from spade_llm.demo.contractnet.agents import MccExpertAgent, SpendingProfileAgent, UsersList, PeriodExpertAgent, \
     Period, TransactionsAgent
 from spade_llm.discovery import DirectoryFacilitatorAgent, AgentSearchRequest, AgentSearchResponse, \
     RegisterAgentBehavior
-from tests.base import SpadeTestCase, ModelTestCase
+from tests.base import SpadeTestCase, ModelTestCase, DummyAgent
 from tests.discovery import DF_ADDRESS
 from tests.models import MODELS
 
@@ -252,6 +248,47 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
         result = UsersList.model_validate_json(list.body)
 
         self.assertGreater(len(result.ids),0)
+
+    def test_contractnet_initiator(self):
+        agent = DummyAgent(
+            jid="initiator@localhost",
+            password="pwd")
+
+        initiator = ContractNetInitiatorBehavior(
+            task="Люди, которые ходят в бары",
+            df_address=DF_ADDRESS)
+
+        agent.add_behaviour(initiator, initiator.construct_template())
+        SpadeTestCase.startAgent(agent)
+        SpadeTestCase.wait_for_behavior(initiator)
+        SpadeTestCase.stopAgent(agent)
+
+        self.assertTrue(initiator.is_successful)
+        self.assertEqual(SPENDINGS_AGENT, str(initiator.result.sender))
+
+        result = UsersList.model_validate_json(initiator.result.body)
+        self.assertGreater(len(result.ids),0)
+
+    def test_contractnet_initiator_with_period(self):
+        agent = DummyAgent(
+                jid="initiator@localhost",
+                password="pwd")
+
+        initiator = ContractNetInitiatorBehavior(
+            task="Люди, которые ходили в бары в прошлом месяце",
+            df_address=DF_ADDRESS)
+
+        agent.add_behaviour(initiator, initiator.construct_template())
+        SpadeTestCase.startAgent(agent)
+        SpadeTestCase.wait_for_behavior(initiator)
+        SpadeTestCase.stopAgent(agent)
+
+        self.assertTrue(initiator.is_successful)
+        self.assertEqual(TRANSACTIONS_AGENT, str(initiator.result.sender))
+
+        result = UsersList.model_validate_json(initiator.result.body)
+        self.assertGreater(len(result.ids),0)
+
 
 if __name__ == '__main__':
     unittest.main()

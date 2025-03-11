@@ -9,6 +9,7 @@ from unittest import TestCase
 
 from langchain_gigachat import GigaChat, GigaChatEmbeddings
 from spade.agent import Agent
+from spade.behaviour import CyclicBehaviour
 from spade.cli import create_cli
 from spade.container import Container
 from spade.message import Message
@@ -90,6 +91,13 @@ class SpadeTestCase(TestCase):
     @staticmethod
     def run_in_container(coro: Awaitable) -> None:
         SpadeTestCase.container.run(coro)
+
+    @staticmethod
+    async def await_for_behavior(beh: CyclicBehaviour, time: float = 10):
+        await beh.join(time)
+
+    def wait_for_behavior(beh: CyclicBehaviour, time: float = 10):
+        SpadeTestCase.run_in_container(SpadeTestCase.await_for_behavior(beh, time))
 
     def test_xmmp_runnig(self):
         self.assertTrue(SpadeTestCase.xmmp.is_alive())

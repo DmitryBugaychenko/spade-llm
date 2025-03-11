@@ -5,6 +5,7 @@ from collections import UserList
 from sys import maxsize
 from typing import Union, Optional
 
+from IPython.core.release import author
 from async_lru import alru_cache
 from pathlib import Path
 
@@ -288,8 +289,8 @@ class SpendingProfileAgent(Agent, ContractNetResponder):
         response = await self.check_task(request.task)
 
         logger.info("For request '%s' model response is '%s'", request.task, response.content)
-        if response.content == "Да":
-            return ContractNetProposal(request = request, estimate = 1.0)
+        if response.content.startswith("Да"):
+            return ContractNetProposal(author = str(self.jid), request = request, estimate = 1.0)
         else:
             return None
 
@@ -373,7 +374,7 @@ class TransactionsAgent(SpendingProfileAgent):
         self._period_expert = period_expert
 
     async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
-        return ContractNetProposal(estimate = 10, request = request)
+        return ContractNetProposal(author = str(self.jid), estimate = 10, request = request)
 
     class RequestBehaviour(SpendingProfileAgent.RequestBehaviour):
         period_expert: str
