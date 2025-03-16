@@ -7,6 +7,8 @@ A simple demo of hierarchy with four agents:
         * Savings agent - manages user savings and is capable of replenish payment account, but requires user confirmation passing message back to chat agent, does not use LLM
     * Wikipedia search - a build on langchain tool
 
+To run the demo open a terminal at the root of the GitHub project and follow the steps below.
+
 Install requirements
 ```
 pip install -r ./requirements.txt
