@@ -11,6 +11,8 @@ Examples are provided based on GigaChat model. In order to run them your need to
 export GIGA_CRED=<your access token>
 ```
 
+If you want to try demo with other models, adjust [models.py](https://github.com/DmitryBugaychenko/spade-llm/blob/main/spade_llm/demo/models.py) file.
+
 Following examples are provided:
 1. [Hierarchical organization](https://github.com/DmitryBugaychenko/spade-llm/tree/main/spade_llm/demo/hierarchy) - demonstrate a hierarchy of REACT and coded agents delegating tasks top down and escalating problems bottom up.
 2. [Contract Net](https://github.com/DmitryBugaychenko/spade-llm/tree/main/spade_llm/demo/contractnet) - an example of "open system" where the user-facing agent does not know others upfront, uses discovery service (directory facilitator) to find them and Contract Net to allocate task efficiently. 

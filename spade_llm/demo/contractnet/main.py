@@ -1,20 +1,17 @@
 import logging
-import os
 import sys
 from asyncio import sleep as asleep
 from multiprocessing import Process
 
 import spade
 from aioconsole import ainput
-from langchain_gigachat import GigaChatEmbeddings
-from langchain_gigachat.chat_models import GigaChat
 from spade import wait_until_finished
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 from spade.cli import create_cli
 
 from spade_llm.contractnet import ContractNetInitiatorBehavior
-from spade_llm.demo.hierarchy.agents import ChatAgent
+from spade_llm.demo import models
 from spade_llm.demo.contractnet.agents import MccExpertAgent, PeriodExpertAgent, SpendingProfileAgent, \
     TransactionsAgent, UsersList
 from spade_llm.discovery import DirectoryFacilitatorAgent
@@ -79,16 +76,8 @@ async def main():
     xmmp = Process(target=start_xmmp, daemon=True)
     xmmp.start()
 
-    model = GigaChat(
-        credentials=os.environ['GIGA_CRED'],
-        model="GigaChat-Max",
-        verify_ssl_certs=False,
-    )
-
-    embeddings=GigaChatEmbeddings(
-        credentials=os.environ['GIGA_CRED'],
-        verify_ssl_certs=False,
-    )
+    model = models.MAX
+    embeddings=models.EMBEDDINGS
 
     expert = MccExpertAgent(
         embeddings=embeddings,
