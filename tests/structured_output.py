@@ -21,7 +21,7 @@ class TestStructuredOutput(ModelTestCase):
         )
 
     def test_with_structured_output(self):
-        structured_llm = self.pro.with_structured_output(self.Joke)
+        structured_llm = self.lite.with_structured_output(self.Joke)
 
         joke = structured_llm.invoke("Tell me a joke about cats")
         print("From structured output: " + str(joke))
@@ -38,7 +38,7 @@ class TestStructuredOutput(ModelTestCase):
                 ("human", "{query}"),
             ]
         ).partial(format_instructions=parser.get_format_instructions())
-        chain = prompt | self.pro | parser
+        chain = prompt | self.lite | parser
 
         joke = chain.invoke({"query" : "Tell me a joke about cats"})
         print("From output parser: " + str(joke))

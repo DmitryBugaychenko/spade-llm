@@ -29,7 +29,7 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
         SpadeTestCase.setUpClass()
         expert = MccExpertAgent(
             embeddings=MODELS.embeddings,
-            model=MODELS.max,
+            model=MODELS.pro,
             data_path=DATA_PATH,
             jid=MCC_EXPERT,
             password="pwd"
@@ -37,7 +37,7 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
         SpadeTestCase.startAgent(expert)
 
         period = PeriodExpertAgent(
-            model=MODELS.max,
+            model=MODELS.pro,
             date="2012-04-01",
             jid=PERIOD_AGENT,
             password="pwd"
@@ -54,7 +54,7 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
             data_path=DATA_PATH,
             mcc_expert=MCC_EXPERT,
             df_address=DF_ADDRESS,
-            model=MODELS.max,
+            model=MODELS.pro,
             jid=SPENDINGS_AGENT,
             password="pwd"
         )
@@ -69,7 +69,7 @@ class ContractNetTestCase(SpadeTestCase, ModelTestCase):
             mcc_expert=MCC_EXPERT,
             period_expert=PERIOD_AGENT,
             df_address=DF_ADDRESS,
-            model=MODELS.max,
+            model=MODELS.pro,
             jid=TRANSACTIONS_AGENT,
             password="pwd"
         )

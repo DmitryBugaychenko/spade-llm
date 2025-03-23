@@ -7,7 +7,7 @@ from langchain_gigachat import GigaChatEmbeddings
 experience problems in tool calling with multiple tools."""
 LITE = GigaChat(
     credentials=os.environ['GIGA_CRED'],
-    model="GigaChat-Lite",
+    model="GigaChat",
     streaming=False,
     verify_ssl_certs=False,
 )

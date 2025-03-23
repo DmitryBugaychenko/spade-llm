@@ -108,15 +108,21 @@ class SpadeTestCase(TestCase):
 
 
 class ModelTestCase(TestCase):
+    lite = GigaChat(
+        credentials=os.environ['GIGA_CRED'],
+        model="GigaChat-2",
+        verify_ssl_certs=False,
+    )
+
     pro = GigaChat(
         credentials=os.environ['GIGA_CRED'],
-        model="GigaChat-Pro",
+        model="GigaChat-2-Pro",
         verify_ssl_certs=False,
     )
 
     max = GigaChat(
         credentials=os.environ['GIGA_CRED'],
-        model="GigaChat-Max",
+        model="GigaChat-2-Max",
         verify_ssl_certs=False,
     )
 

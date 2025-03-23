@@ -6,6 +6,8 @@ from langchain_chroma import Chroma
 from langchain_core.prompts import PromptTemplate
 from urllib3 import request
 
+from tests.models import MODELS
+
 
 def main():
     loader = CSVLoader(file_path='../data/mcc_codes.csv',
@@ -24,23 +26,15 @@ def main():
 
     index.add_documents([x for x in loader.load() if len(x.page_content) > 100])
 
-    max = GigaChat(
-        credentials=os.environ['GIGA_CRED'],
-        model="GigaChat-Max",
-        verify_ssl_certs=False,
-    )
+    max = MODELS.max
 
-    lite = GigaChat(
-        credentials=os.environ['GIGA_CRED'],
-        model="GigaChat",
-        verify_ssl_certs=False,
-    )
+    lite = MODELS.lite
 
     prepare_request_prompt = PromptTemplate.from_template(
         """Твоя задача сформулировать описание MCC кода для транзакций, обозначающей траты людей 
         подпадающих под описание "{query}". Верни только само описание из не менее 20 слов.""")
 
-    request = max.invoke(prepare_request_prompt.invoke({"query":"люди, которые ходят в бары"}))
+    request = lite.invoke(prepare_request_prompt.invoke({"query":"люди, которые ходят в бары"}))
     print(request)
     result = index.similarity_search(query=request.content, k=1)
     print("\n".join([f"{x.metadata["MCC"]}:{x.page_content}" for x in result]))
