@@ -1,10 +1,16 @@
 from spade_llm.platform.api import KeyValueStorage
+from pydantic import BaseModel
+import json
+
+class TrackedKeys(BaseModel):
+    tracked_keys: list[str]
 
 class PrefixKeyValueStorage(KeyValueStorage):
+    TRACKED_KEYS_KEY = "_tracked_keys"
+    
     def __init__(self, wrapped_storage: KeyValueStorage, prefix: str):
         self.wrapped_storage = wrapped_storage
         self.prefix = prefix
-        self.tracked_keys = []
 
     async def get_item(self, key: str) -> str | None:
         prefixed_key = f"{self.prefix}:{key}"
@@ -14,9 +20,29 @@ class PrefixKeyValueStorage(KeyValueStorage):
         prefixed_key = f"{self.prefix}:{key}"
         await self.wrapped_storage.put_item(prefixed_key, value)
         if value is not None:
-            self.tracked_keys.append(prefixed_key)
+            await self._add_tracked_key(prefixed_key)
+
+    async def _get_tracked_keys(self) -> TrackedKeys:
+        data = await self.wrapped_storage.get_item(self.TRACKED_KEYS_KEY)
+        if data:
+            return TrackedKeys.model_validate_json(data)
+        else:
+            return TrackedKeys(tracked_keys=[])
+
+    async def _set_tracked_keys(self, tracked_keys: TrackedKeys):
+        await self.wrapped_storage.put_item(
+            self.TRACKED_KEYS_KEY, 
+            tracked_keys.model_dump_json(exclude_unset=True)
+        )
+
+    async def _add_tracked_key(self, key: str):
+        tracked_keys = await self._get_tracked_keys()
+        if key not in tracked_keys.tracked_keys:
+            tracked_keys.tracked_keys.append(key)
+            await self._set_tracked_keys(tracked_keys)
 
     async def close(self):
-        for key in self.tracked_keys:
+        tracked_keys = await self._get_tracked_keys()
+        for key in tracked_keys.tracked_keys:
             await self.wrapped_storage.put_item(key, None)
-        self.tracked_keys.clear()
+        await self._set_tracked_keys(TrackedKeys(tracked_keys=[]))
