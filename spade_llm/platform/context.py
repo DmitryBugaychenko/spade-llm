@@ -1,14 +1,15 @@
+import uuid
 from uuid import UUID
 from typing import List, Optional
-from random import getrandbits
 
 from langchain_core.tools import BaseTool
 
-from .api import KeyValueStorage, MessageService, Message, AgentContext
-from .core import PrefixKeyValueStorage
+from spade_llm.platform.api import KeyValueStorage, MessageService, Message, AgentContext
+from spade_llm.platform.storage import PrefixKeyValueStorage
 
 
 class AgentContextImpl(AgentContext):
+
     def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService):
         self.kv_store = kv_store
         self.agent_id = agent_id
@@ -46,7 +47,7 @@ class AgentContextImpl(AgentContext):
         raise RuntimeError("Thread context unavailable because there's no active thread.")
 
     async def fork_thread(self) -> "AgentContextImpl":
-        new_thread_id = UUID(int=getrandbits(128)) 
+        new_thread_id = uuid.uuid4()
         new_context = AgentContextImpl(self.kv_store, self.agent_id, new_thread_id, self.message_service)
         return new_context
 
@@ -65,6 +66,9 @@ class AgentContextImpl(AgentContext):
 
     async def put_item(self, key: str, value: Optional[str]) -> None:
         await self.kv_store.put_item(key, value)
+
+    async def close(self):
+        await self.kv_store.close()
 
     @property
     def tools(self) -> List[BaseTool]:
