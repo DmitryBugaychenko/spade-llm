@@ -1,11 +1,13 @@
 import asyncio
 from typing import Dict, List
 
+from langchain_core.tools import BaseTool
 from spade_llm.platform.api import (
     AgentHandler,
     AgentPlatform,
     KeyValueStorage,
     MessageService,
+    MessageSource,
     StorageFactory,
     AgentContextImpl,
     Message,
@@ -19,7 +21,7 @@ class AgentPlatformImpl(AgentPlatform):
         self.storages: Dict[str, KeyValueStorage] = {}
         self.run_loop_task = None
 
-    async def register_agent(self, handler: AgentHandler, tools: List["BaseTool"]):
+    async def register_agent(self, handler: AgentHandler, tools: List[BaseTool]):
         agent_type = handler.agent_type
         if agent_type in self.agents:
             raise ValueError(f"An agent with type '{agent_type}' is already registered.")
@@ -33,7 +35,7 @@ class AgentPlatformImpl(AgentPlatform):
         if not self.run_loop_task:
             self.run_loop_task = task  # Keep track of the first task started
 
-    async def consume_messages(self, handler: AgentHandler, message_source: "MessageSource"):
+    async def consume_messages(self, handler: AgentHandler, message_source: MessageSource):
         while True:
             message = await message_source.fetch_message()
             if message is None:
