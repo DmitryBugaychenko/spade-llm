@@ -1,5 +1,5 @@
 import asyncio
-from spade_llm.platform.api import AgentHandler, Message
+from spade_llm.platform.api import AgentHandler, Message, AgentId
 from spade_llm.platform.platform import AgentPlatformImpl
 from spade_llm.platform.storage import InMemoryStorageFactory
 from spade_llm.platform.messaging import DictionaryMessageService
@@ -29,9 +29,11 @@ async def main():
             break
 
         # Construct a message and send it to the agent
-        message = Message(sender={"agent_type": "console", "agent_id": "user"},
-                          receiver={"agent_type": "echo", "agent_id": "echo_agent"},
-                          content=user_input)
+        message = Message(
+            sender=AgentId(agent_type="console", agent_id="user"),
+            receiver=AgentId(agent_type="echo", agent_id="echo_agent"),
+            content=user_input
+        )
         await message_service.post_message(message)
 
     # Shut down the platform gracefully
