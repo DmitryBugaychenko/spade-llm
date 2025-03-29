@@ -47,4 +47,4 @@ class PrefixKeyValueStorage(KeyValueStorage):
         tracked_keys = await self._get_tracked_keys()
         for key in tracked_keys.tracked_keys:
             await self.wrapped_storage.put_item(key, None)
-        await self._set_tracked_keys(TrackedKeys(tracked_keys=[]))
+        await self.wrapped_storage.put_item(f"{self.prefix}:{self.TRACKED_KEYS_KEY}", None)
