@@ -5,7 +5,7 @@ from typing import List, Optional
 from langchain_core.tools import BaseTool
 
 from spade_llm.platform.api import KeyValueStorage, MessageService, Message, AgentContext
-from spade_llm.platform.storage import PrefixKeyValueStorage
+from spade_llm.platform.storage import PrefixKeyValueStorage, TransientKeyValueStorage
 
 
 class AgentContextImpl(AgentContext):
@@ -42,7 +42,9 @@ class AgentContextImpl(AgentContext):
     def thread_context(self) -> KeyValueStorage:
         if self.has_thread:
             if not self._thread_kv_store:
-                self._thread_kv_store = PrefixKeyValueStorage(wrapped_storage=self.kv_store, prefix=str(self.thread_id))
+                self._thread_kv_store = (
+                    TransientKeyValueStorage(
+                        PrefixKeyValueStorage(wrapped_storage=self.kv_store, prefix=str(self.thread_id))))
             return self._thread_kv_store
         raise RuntimeError("Thread context unavailable because there's no active thread.")
 

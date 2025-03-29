@@ -5,7 +5,6 @@ from typing import Optional
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
-import spade_llm.platform.core as core
 
 class AgentId(BaseModel):
     agent_type: str = Field(description="Name of the agent type used to route message to a proper system."
@@ -39,6 +38,26 @@ class KeyValueStorage(metaclass=ABCMeta):
         Sets a new value for an item in agent key/value store
         :param key: Key of the item to set or update
         :param value: Value to put or None to remove the item
+        """
+        pass
+
+    @abstractmethod
+    async def close(self):
+        """
+        Closes connection to the storage. For transient storage clears all the data
+        """
+        pass
+
+class StorageFactory(metaclass=ABCMeta):
+    """
+    Used to created storage connections for the agents
+    """
+    @abstractmethod
+    async def create_storage(self, agent_type: str):
+        """
+        Create a new storage connection
+        :param agent_type: Agent type to use connection for
+        :return: Storage connection to use for the agent type
         """
         pass
 
@@ -139,10 +158,13 @@ class AgentContext(KeyValueStorage, metaclass=ABCMeta):
         return self.thread_id is not None
 
     @property
+    @abstractmethod
     def thread_context(self) -> KeyValueStorage:
-        if self.has_thread:
-            return core.PrefixKeyValueStorage(wrapped_storage=self, prefix=str(self.thread_id))
-        raise RuntimeError("Thread context unavailable because there’s no active thread.")
+        """
+        For context with thread set returns key value storage associated with the thread
+        :return: Key value storage for the thread.
+        """
+        pass
 
     @abstractmethod
     async def fork_thread(self) -> "AgentContext":
