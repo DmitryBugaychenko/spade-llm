@@ -12,6 +12,7 @@ from spade_llm.platform.api import (
     StorageFactory,
 )
 from spade_llm.platform.context import AgentContextImpl
+from spade_llm.platform.storage import PrefixKeyValueStorage
 
 
 class AgentPlatformImpl(AgentPlatform):
@@ -42,12 +43,10 @@ class AgentPlatformImpl(AgentPlatform):
                 break  # No more messages to process
 
             # Prepare the context for handling the message
-            context = AgentContextImpl(
-                kv_store=self.storages[handler.agent_type],
-                agent_id=message.receiver.agent_id,
-                thread_id=message.thread_id,
-                message_service=self.message_service,
-            )
+            agent_id = message.receiver.agent_id
+            kv_store = PrefixKeyValueStorage(self.storages[handler.agent_type], agent_id)
+            
+            context = AgentContextImpl(kv_store, agent_id, message.thread_id, self.message_service, tools=[])
 
             # Pass the message to the agent handler
             await handler.handle_message(context, message)
