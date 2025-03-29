@@ -6,9 +6,9 @@ class PrefixKeyValueStorage(KeyValueStorage):
         self.prefix = prefix
 
     async def get_item(self, key: str) -> str | None:
-        prefixed_key = f"{self.prefix};{key}"
+        prefixed_key = f"{self.prefix}:{key}"
         return await self.wrapped_storage.get_item(prefixed_key)
 
     async def put_item(self, key: str, value: str | None):
-        prefixed_key = f"{self.prefix};{key}"
+        prefixed_key = f"{self.prefix}:{key}"
         await self.wrapped_storage.put_item(prefixed_key, value)
