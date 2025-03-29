@@ -1,4 +1,5 @@
 import asyncio
+from aioconsole import ainput
 from spade_llm.platform.api import AgentHandler, Message, AgentId
 from spade_llm.platform.platform import AgentPlatformImpl
 from spade_llm.platform.storage import InMemoryStorageFactory
@@ -24,7 +25,7 @@ async def main():
 
     # Main loop to read user input and send messages
     while True:
-        user_input = input("Enter a message to send to the agent (type 'exit' to quit): ")
+        user_input = await ainput("Enter a message to send to the agent (type 'exit' to quit): ")
         if user_input.lower() == 'exit':
             break
 
@@ -32,6 +33,7 @@ async def main():
         message = Message(
             sender=AgentId(agent_type="console", agent_id="user"),
             receiver=AgentId(agent_type="echo", agent_id="echo_agent"),
+            performative="inform",
             content=user_input
         )
         await message_service.post_message(message)

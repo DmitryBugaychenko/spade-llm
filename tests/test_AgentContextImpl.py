@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
 from spade_llm.platform.context import AgentContextImpl
-from spade_llm.platform.api import KeyValueStorage, MessageService, Message
+from spade_llm.platform.api import KeyValueStorage, MessageService, Message, AgentId
+
 
 class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
     async def test_fork_thread_creates_new_context_with_new_thread_id(self):
@@ -20,18 +21,24 @@ class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
         original_context = AgentContextImpl(kv_store_mock, "original_agent_id", UUID("123e4567-e89b-12d3-a456-426655440000"), message_service_mock)
-        original_context._thread_kv_store = AsyncMock()
+        thread_context_mock = AsyncMock()
+        original_context._thread_kv_store = thread_context_mock
         
         await original_context.close_thread()
         
         self.assertIsNone(original_context.thread_id)
-        self.assertTrue(original_context._thread_kv_store.close.called)
+        self.assertTrue(thread_context_mock.close.called)
 
     async def test_send_posts_message_via_message_service(self):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
+
         context = AgentContextImpl(kv_store_mock, "test_agent_id", None, message_service_mock)
-        message = Message(sender="sender", receiver="receiver", content="Test message")
+
+        sender = AgentId(agent_type="sender-type", agent_id="sender-id")
+        receiver = AgentId(agent_type="receiver-type", agent_id="receiver-id")
+
+        message = Message(sender=sender, receiver=receiver, content="Test message", performative="inform")
         
         await context.send(message)
         

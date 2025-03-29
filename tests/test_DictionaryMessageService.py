@@ -1,7 +1,9 @@
 import unittest
-import asyncio
-from spade_llm.platform.core import DictionaryMessageService, Message
+
 from spade_llm.platform.api import AgentId
+from spade_llm.platform.api import Message
+from spade_llm.platform.messaging import DictionaryMessageService
+
 
 class TestDictionaryMessageService(unittest.IsolatedAsyncioTestCase):
     async def test_get_or_create_source(self):
@@ -14,8 +16,8 @@ class TestDictionaryMessageService(unittest.IsolatedAsyncioTestCase):
         dms = DictionaryMessageService()
         source = await dms.get_or_create_source('test-agent-type')
         
-        sender = AgentId(agent_type="sender-type", agent_id="sender-id")
-        receiver = AgentId(agent_type="receiver-type", agent_id="receiver-id")
+        sender = AgentId(agent_type="test-agent-type", agent_id="sender-id")
+        receiver = AgentId(agent_type="test-agent-type", agent_id="receiver-id")
         
         msg = Message(sender=sender, receiver=receiver, content='Test message', performative="inform")
         

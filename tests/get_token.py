@@ -6,7 +6,7 @@ def main():
 
     giga = GigaChat(
         credentials=os.environ['GIGA_CRED'],
-        ca_bundle_file="/Users/dmitrybugaychenko/Documents/RCA.pem.pem"
+        verify_ssl_certs=False
     )
 
     response = giga.get_token()

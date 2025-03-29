@@ -1,7 +1,9 @@
 import unittest
-import asyncio
-from spade_llm.platform.core import MessageSourceImpl, Message
+
 from spade_llm.platform.api import AgentId
+from spade_llm.platform.api import Message
+from spade_llm.platform.messaging import MessageSourceImpl
+
 
 class TestMessageSourceImpl(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_and_post_message(self):

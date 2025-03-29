@@ -42,8 +42,8 @@ class TestTransientKeyValueStorage(unittest.IsolatedAsyncioTestCase):
         
         await transient_storage.close()
         
-        result_after_closing_1 = await transient_storage.get_item('key1')
-        result_after_closing_2 = await transient_storage.get_item('key2')
+        result_after_closing_1 = await memory_storage.get_item('key1')
+        result_after_closing_2 = await memory_storage.get_item('key2')
         
         self.assertIsNone(result_after_closing_1)
         self.assertIsNone(result_after_closing_2)
