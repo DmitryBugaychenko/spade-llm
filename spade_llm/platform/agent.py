@@ -129,7 +129,7 @@ class PerformativeDispatcher(MessageDispatcher):
     """
 
     def __init__(self):
-        self.behaviors_by_performative: Dict[Optional[str], List[Behaviour]] = {}
+        self._behaviors_by_performative: Dict[Optional[str], List[Behaviour]] = {}
     
     def add_behaviour(self, beh: Behaviour):
         """
@@ -137,9 +137,9 @@ class PerformativeDispatcher(MessageDispatcher):
         :param beh: Behavior to add.
         """
         performative = beh.template.performative
-        if performative not in self.behaviors_by_performative:
-            self.behaviors_by_performative[performative] = []
-        self.behaviors_by_performative[performative].append(beh)
+        if performative not in self._behaviors_by_performative:
+            self._behaviors_by_performative[performative] = []
+        self._behaviors_by_performative[performative].append(beh)
 
     def remove_behaviour(self, beh: Behaviour):
         """
@@ -147,17 +147,17 @@ class PerformativeDispatcher(MessageDispatcher):
         :param beh: Behavior to remove.
         """
         performative = beh.template.performative
-        if performative in self.behaviors_by_performative:
-            self.behaviors_by_performative[performative].remove(beh)
-            if not self.behaviors_by_performative[performative]:  
-                del self.behaviors_by_performative[performative]
+        if performative in self._behaviors_by_performative:
+            self._behaviors_by_performative[performative].remove(beh)
+            if not self._behaviors_by_performative[performative]:
+                del self._behaviors_by_performative[performative]
 
     def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
         """Lookups for behavior matching given message, first selects proper list based on performative,
         then finds the first one with matching template."""
         performative = msg.performative
-        if performative in self.behaviors_by_performative:
-            for beh in self.behaviors_by_performative[performative]:
+        if performative in self._behaviors_by_performative:
+            for beh in self._behaviors_by_performative[performative]:
                 if beh.template.match(msg):
                     return beh
         return None
@@ -166,7 +166,7 @@ class PerformativeDispatcher(MessageDispatcher):
     @property
     def is_empty(self) -> bool:
         """Returns true if there are no behaviors."""
-        return len(self.behaviors_by_performative) == 0
+        return len(self._behaviors_by_performative) == 0
 
 class ThreadDispatcher(MessageDispatcher):
     """
@@ -174,7 +174,7 @@ class ThreadDispatcher(MessageDispatcher):
     When behaviour is removed checks if nested dispatcher is empty and removes it if so.
     """
     def __init__(self):
-        self.dispatchers_by_thread: Dict[Optional[uuid.UUID], PerformativeDispatcher] = {}
+        self._dispatchers_by_thread: Dict[Optional[uuid.UUID], PerformativeDispatcher] = {}
 
     def add_behaviour(self, beh: Behaviour):
         """
@@ -182,9 +182,9 @@ class ThreadDispatcher(MessageDispatcher):
         :param beh: Behavior to add.
         """
         thread_id = beh.template.thread_id
-        if thread_id not in self.dispatchers_by_thread:
-            self.dispatchers_by_thread[thread_id] = PerformativeDispatcher()
-        self.dispatchers_by_thread[thread_id].add_behaviour(beh)
+        if thread_id not in self._dispatchers_by_thread:
+            self._dispatchers_by_thread[thread_id] = PerformativeDispatcher()
+        self._dispatchers_by_thread[thread_id].add_behaviour(beh)
 
     def remove_behaviour(self, beh: Behaviour):
         """
@@ -192,18 +192,18 @@ class ThreadDispatcher(MessageDispatcher):
         :param beh: Behavior to remove.
         """
         thread_id = beh.template.thread_id
-        if thread_id in self.dispatchers_by_thread:
-            self.dispatchers_by_thread[thread_id].remove_behaviour(beh)
-            if self.dispatchers_by_thread[thread_id].is_empty:
-                del self.dispatchers_by_thread[thread_id]
+        if thread_id in self._dispatchers_by_thread:
+            self._dispatchers_by_thread[thread_id].remove_behaviour(beh)
+            if self._dispatchers_by_thread[thread_id].is_empty:
+                del self._dispatchers_by_thread[thread_id]
 
     def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
         """
         Find matching behavior for the given message.
         """
         thread_id = msg.thread_id
-        if thread_id in self.dispatchers_by_thread:
-            return self.dispatchers_by_thread[thread_id].find_matching_behaviour(msg)
+        if thread_id in self._dispatchers_by_thread:
+            return self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg)
         return None
 
     @property
@@ -211,4 +211,4 @@ class ThreadDispatcher(MessageDispatcher):
         """
         Check if all dispatchers are empty.
         """
-        return len(self.dispatchers_by_thread) == 0
+        return len(self._dispatchers_by_thread) == 0
