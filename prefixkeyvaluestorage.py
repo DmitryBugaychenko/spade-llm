@@ -5,7 +5,7 @@ class PrefixKeyValueStorage(KeyValueStorage):
         self.wrapped_storage = wrapped_storage
         self.prefix = prefix
 
-    async def get_item(self, key: str) -> str:
+    async def get_item(self, key: str) -> str | None:
         prefixed_key = f"{self.prefix}{key}"
         return await self.wrapped_storage.get_item(prefixed_key)
 
