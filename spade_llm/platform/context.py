@@ -10,13 +10,13 @@ from spade_llm.platform.storage import PrefixKeyValueStorage
 
 class AgentContextImpl(AgentContext):
 
-    def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService):
+    def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService, tools: List[BaseTool] = []):
         self.kv_store = kv_store
         self.agent_id = agent_id
         self.thread_id = thread_id
         self.message_service = message_service
-        self.tools: List[BaseTool] = []
-        self._thread_kv_store: Optional[PrefixKeyValueStorage] = None  # New attribute to hold the thread-specific KV store
+        self.tools = tools
+        self._thread_kv_store: Optional[PrefixKeyValueStorage] = None  
 
     @property
     def agent_id(self) -> str:
