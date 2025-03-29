@@ -173,3 +173,42 @@ class ThreadDispatcher(MessageDispatcher):
     Stores PerformativeDispatcher grouped by thread id with a separate list for behaviors without thread specified.
     When behaviour is removed checks if nested dispatcher is empty and removes it if so.
     """
+    def __init__(self):
+        self.dispatchers_by_thread: Dict[Optional[uuid.UUID], PerformativeDispatcher] = {}
+
+    def add_behaviour(self, beh: Behaviour):
+        """
+        Add behavior to dispatch list.
+        :param beh: Behavior to add.
+        """
+        thread_id = beh.template.thread_id
+        if thread_id not in self.dispatchers_by_thread:
+            self.dispatchers_by_thread[thread_id] = PerformativeDispatcher()
+        self.dispatchers_by_thread[thread_id].add_behaviour(beh)
+
+    def remove_behaviour(self, beh: Behaviour):
+        """
+        Removes behavior from dispatch.
+        :param beh: Behavior to remove.
+        """
+        thread_id = beh.template.thread_id
+        if thread_id in self.dispatchers_by_thread:
+            self.dispatchers_by_thread[thread_id].remove_behaviour(beh)
+            if self.dispatchers_by_thread[thread_id].is_empty:
+                del self.dispatchers_by_thread[thread_id]
+
+    def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
+        """
+        Find matching behavior for the given message.
+        """
+        thread_id = msg.thread_id
+        if thread_id in self.dispatchers_by_thread:
+            return self.dispatchers_by_thread[thread_id].find_matching_behaviour(msg)
+        return None
+
+    @property
+    def is_empty(self) -> bool:
+        """
+        Check if all dispatchers are empty.
+        """
+        return len(self.dispatchers_by_thread) == 0
