@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 from spade_llm.platform.agent import PerformativeDispatcher, Behaviour, MessageTemplate, Message
+from spade_llm.platform.api import AgentId
 
 class MockBehavior(Behaviour):
     def __init__(self, template: MessageTemplate):
@@ -34,7 +35,18 @@ class TestPerformativeDispatcher(unittest.TestCase):
         template = MessageTemplate(performative='test')
         mock_behaviour = MockBehavior(template)
         self.dispatcher.add_behaviour(mock_behaviour)
-        message = Message(performative='test', content='')
+        
+        # Use AgentId for sender and receiver
+        sender = AgentId(agent_type="TestSender", agent_id="1")
+        receiver = AgentId(agent_type="TestReceiver", agent_id="2")
+        
+        message = Message(
+            sender=sender,
+            receiver=receiver,
+            performative='test',
+            content=''
+        )
+        
         found_behaviour = self.dispatcher.find_matching_behaviour(message)
         self.assertIsNotNone(found_behaviour)
         self.assertEqual(found_behaviour, mock_behaviour)
