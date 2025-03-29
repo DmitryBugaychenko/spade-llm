@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from spade_llm.platform.api import KeyValueStorage
 from spade_llm.platform.prefixkeyvaluestorage import PrefixKeyValueStorage
 
@@ -26,7 +26,20 @@ class TestPrefixKeyValueStorage(unittest.IsolatedAsyncioTestCase):
         
         await prefix_storage.put_item('key', 'value')
         await prefix_storage.close()
+        mock_storage.put_item.assert_any_call('test:_tracked_keys', '{"tracked_keys":[]}')
         mock_storage.put_item.assert_any_call('test:key', None)
+
+    async def test_add_and_remove_tracked_key(self):
+        mock_storage = AsyncMock(spec=KeyValueStorage)
+        prefix_storage = PrefixKeyValueStorage(mock_storage, 'test')
+        
+        await prefix_storage.put_item('key1', 'value1')  # Adds key1 to tracked keys
+        await prefix_storage.put_item('key2', 'value2')  # Adds key2 to tracked keys
+        await prefix_storage.close()                     # Removes all tracked keys
+        
+        mock_storage.put_item.assert_any_call('test:_tracked_keys', '{"tracked_keys":[]}')
+        mock_storage.put_item.assert_any_call('test:key1', None)
+        mock_storage.put_item.assert_any_call('test:key2', None)
 
 if __name__ == "__main__":
     unittest.main()
