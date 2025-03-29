@@ -1,4 +1,4 @@
-from spade_llm.api import KeyValueStorage
+from spade_llm.platform.api import KeyValueStorage
 
 class InMemoryKeyValueStorage(KeyValueStorage):
     def __init__(self):
