@@ -64,18 +64,65 @@ class Behaviour(MessageHandler, metaclass=ABCMeta):
     handles it
     """
     @property
+    @abstractmethod
     def template(self) -> MessageTemplate:
-        pass
+        """Template used to get messages for this behavior"""
 
     @abstractmethod
     def is_done(self) -> bool:
         """
         Returns true if behavior is completed and should not accept messages anymore and false otherwise
         """
-        pass
+
+class CyclicBehaviour(Behaviour, metaclass=ABCMeta):
+    """Cyclic behaviour which is never done."""
+    def is_done(self) -> bool:
+        return False
+
+class OneShotBehaviour(Behaviour, metaclass=ABCMeta):
+    """One shot behaviour is done after first execution."""
+    def is_done(self) -> bool:
+        return True
 
 
-class PerformativeDispatcher(MessageHandler):
+class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
+    @abstractmethod
+    def add_behaviour(self, beh):
+        """
+        Add behavior to dispatch list.
+        :param beh: Behavior to add.
+        """
+
+    @abstractmethod
+    def remove_behaviour(self, beh):
+        """
+        Removes behavior from dispatch.
+        :param beh: Behavior to remove.
+        """
+
+    @abstractmethod
+    def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
+        """Lookups for behavior matching given message, first selects proper list based on performative,
+        then finds the first one with matching template."""
+
+    async def handle_message(self, context, message):
+        """
+        Tries to find behavior matching message and passes message to it. Afterward checks if behavior is
+        done and if so removes it.
+        """
+        matched_behavior = self.find_matching_behaviour(message)
+        if matched_behavior:
+            await matched_behavior.handle_message(context, message)
+            if matched_behavior.is_done():
+                self.remove_behaviour(matched_behavior)
+
+    @property
+    @abstractmethod
+    def is_empty(self) -> bool:
+        """Returns true if there are no behaviors."""
+
+
+class PerformativeDispatcher(MessageDispatcher):
     """
     Stores behaviors grouped by performative configured in their templates. Uses dictionary with performative
     as a key and list of behaviors as values plus extra list for behaviors without performative specified.
@@ -105,11 +152,6 @@ class PerformativeDispatcher(MessageHandler):
             if not self.behaviors_by_performative[performative]:  
                 del self.behaviors_by_performative[performative]
 
-    @property
-    def is_empty(self) -> bool:
-        """Returns true if there are no behaviors."""
-        return len(self.behaviors_by_performative) == 0
-
     def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
         """Lookups for behavior matching given message, first selects proper list based on performative,
         then finds the first one with matching template."""
@@ -120,13 +162,14 @@ class PerformativeDispatcher(MessageHandler):
                     return beh
         return None
 
-    async def handle_message(self, context: AgentContext, message: Message):
-        """
-        Tries to find behavior matching message and passes message to it. Afterward checks if behavior is
-        done and if so removes it.
-        """
-        matched_behavior = self.find_matching_behaviour(message)
-        if matched_behavior:
-            await matched_behavior.handle_message(context, message)
-            if matched_behavior.is_done():
-                self.remove_behaviour(matched_behavior)
+
+    @property
+    def is_empty(self) -> bool:
+        """Returns true if there are no behaviors."""
+        return len(self.behaviors_by_performative) == 0
+
+class ThreadDispatcher(MessageDispatcher):
+    """
+    Stores PerformativeDispatcher grouped by thread id with a separate list for behaviors without thread specified.
+    When behaviour is removed checks if nested dispatcher is empty and removes it if so.
+    """
