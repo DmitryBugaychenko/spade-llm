@@ -1,7 +1,12 @@
 from uuid import UUID
 from typing import List, Optional
-from random import getrandbits  
-from .api import KeyValueStorage, MessageService, Message, AgentContext, BaseTool, PrefixKeyValueStorage
+from random import getrandbits
+
+from langchain_core.tools import BaseTool
+
+from .api import KeyValueStorage, MessageService, Message, AgentContext
+from .core import PrefixKeyValueStorage
+
 
 class ConcreteAgentContext(AgentContext):
     def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService):
