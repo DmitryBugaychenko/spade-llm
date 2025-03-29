@@ -1,5 +1,6 @@
 from uuid import UUID
 from typing import List, Optional
+from random import getrandbits  # Import getrandbits from random module
 from .api import KeyValueStorage, MessageService, Message, AgentContext, BaseTool
 
 class ConcreteAgentContext(AgentContext):
@@ -37,7 +38,7 @@ class ConcreteAgentContext(AgentContext):
         raise RuntimeError("Thread context unavailable because there's no active thread.")
 
     async def fork_thread(self) -> "ConcreteAgentContext":
-        new_thread_id = UUID(int=random.getrandbits(128))  # Generate random UUID
+        new_thread_id = UUID(int=getrandbits(128))  # Use getrandbits instead of random.getrandbits
         new_context = ConcreteAgentContext(self.kv_store, self.agent_id, new_thread_id, self.message_service)
         return new_context
 
