@@ -31,6 +31,20 @@ class TestPerformativeDispatcher(unittest.TestCase):
         self.dispatcher.remove_behaviour(mock_behaviour)
         self.assertFalse('test' in self.dispatcher.behaviors_by_performative)
 
+    def test_is_empty(self):
+        # Initially dispatcher should be empty
+        self.assertTrue(self.dispatcher.is_empty)
+
+        # Adding a behavior makes it non-empty
+        template = MessageTemplate(performative='test')
+        mock_behaviour = MockBehavior(template)
+        self.dispatcher.add_behaviour(mock_behaviour)
+        self.assertFalse(self.dispatcher.is_empty)
+
+        # Removing the behavior makes it empty again
+        self.dispatcher.remove_behaviour(mock_behaviour)
+        self.assertTrue(self.dispatcher.is_empty)
+
     def test_find_matching_behaviour(self):
         template = MessageTemplate(performative='test')
         mock_behaviour = MockBehavior(template)
