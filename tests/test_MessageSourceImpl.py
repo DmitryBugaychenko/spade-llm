@@ -1,11 +1,16 @@
 import unittest
 import asyncio
 from spade_llm.platform.core import MessageSourceImpl, Message
+from spade_llm.platform.api import AgentId
 
 class TestMessageSourceImpl(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_and_post_message(self):
         ms = MessageSourceImpl('test-agent')
-        msg = Message(sender='sender', receiver='receiver', content='Test message')
+        
+        sender = AgentId(agent_type="sender-type", agent_id="sender-id")
+        receiver = AgentId(agent_type="receiver-type", agent_id="receiver-id")
+        
+        msg = Message(sender=sender, receiver=receiver, content='Test message', performative="inform")
         
         # Posting a message
         await ms.post_message(msg)
