@@ -20,7 +20,7 @@ class AgentPlatformImpl(AgentPlatform):
         self.message_service = message_service
         self.agents: Dict[str, AgentHandler] = {}
         self.storages: Dict[str, KeyValueStorage] = {}
-        self.run_loop_task = None
+        self.run_loop_tasks: Dict[str, asyncio.Task] = {}  # Store tasks per agent type
 
     async def register_agent(self, handler: AgentHandler, tools: List[BaseTool]):
         agent_type = handler.agent_type
@@ -33,8 +33,7 @@ class AgentPlatformImpl(AgentPlatform):
         # Start listening for incoming messages for this agent type
         message_source = await self.message_service.get_or_create_source(agent_type)
         task = asyncio.create_task(self.consume_messages(handler, message_source))
-        if not self.run_loop_task:
-            self.run_loop_task = task  # Keep track of the first task started
+        self.run_loop_tasks[agent_type] = task  # Store task for this agent type
 
     async def consume_messages(self, handler: AgentHandler, message_source: MessageSource):
         while True:
@@ -57,12 +56,12 @@ class AgentPlatformImpl(AgentPlatform):
             await message_source.message_handled()
 
     async def shutdown(self):
-        if self.run_loop_task:
-            self.run_loop_task.cancel()  # Stop the consumer tasks
-            try:
-                await self.run_loop_task
-            except asyncio.CancelledError:
-                pass
+        # Cancel all running tasks
+        for task in self.run_loop_tasks.values():
+            task.cancel()
+        
+        # Await cancellation of tasks
+        await asyncio.gather(*self.run_loop_tasks.values(), return_exceptions=True)
 
         # Close storages
         for storage in self.storages.values():
