@@ -64,6 +64,7 @@ class TransientKeyValueStorage(KeyValueStorage):
         for key in tracked_keys.tracked_keys:
             await self.wrapped_storage.put_item(key, None)
         await self.wrapped_storage.put_item(self.TRACKED_KEYS_KEY, None)
+        await self.wrapped_storage.close()
 
 class PrefixKeyValueStorage(KeyValueStorage):
     def __init__(self, wrapped_storage: KeyValueStorage, prefix: str):
@@ -79,4 +80,4 @@ class PrefixKeyValueStorage(KeyValueStorage):
         await self.wrapped_storage.put_item(prefixed_key, value)
 
     async def close(self):
-        pass
+        await self.wrapped_storage.close()
