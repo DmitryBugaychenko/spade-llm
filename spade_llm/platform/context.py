@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import List, Optional
 from random import getrandbits  
-from .api import KeyValueStorage, MessageService, Message, AgentContext, BaseTool
+from .api import KeyValueStorage, MessageService, Message, AgentContext, BaseTool, PrefixKeyValueStorage
 
 class ConcreteAgentContext(AgentContext):
     def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService):
@@ -10,6 +10,7 @@ class ConcreteAgentContext(AgentContext):
         self.thread_id = thread_id
         self.message_service = message_service
         self.tools: List[BaseTool] = []
+        self._thread_kv_store: Optional[PrefixKeyValueStorage] = None  # New attribute to hold the thread-specific KV store
 
     @property
     def agent_id(self) -> str:
@@ -34,7 +35,9 @@ class ConcreteAgentContext(AgentContext):
     @property
     def thread_context(self) -> KeyValueStorage:
         if self.has_thread:
-            return self.kv_store
+            if not self._thread_kv_store:
+                self._thread_kv_store = PrefixKeyValueStorage(wrapped_storage=self.kv_store, prefix=str(self.thread_id))
+            return self._thread_kv_store
         raise RuntimeError("Thread context unavailable because there's no active thread.")
 
     async def fork_thread(self) -> "ConcreteAgentContext":
@@ -43,6 +46,9 @@ class ConcreteAgentContext(AgentContext):
         return new_context
 
     async def close_thread(self) -> "ConcreteAgentContext":
+        if self._thread_kv_store:
+            await self._thread_kv_store.close()
+            self._thread_kv_store = None
         self.thread_id = None
         return self
 
