@@ -1,11 +1,12 @@
 import asyncio
-from typing import Optional
+from typing import Dict, Optional
 
 from pydantic import BaseModel
 from spade_llm.platform.api import (
     KeyValueStorage,
     MessageSource,
     Message,
+    MessageService,
 )
 
 class InMemoryKeyValueStorage(KeyValueStorage):
@@ -103,3 +104,18 @@ class MessageSourceImpl(MessageSource):
     @agent_type.setter
     def agent_type(self, value):
         self._agent_type = value
+
+
+class DictionaryMessageService(MessageService):
+    def __init__(self):
+        self.sources: Dict[str, MessageSourceImpl] = {}
+
+    async def get_or_create_source(self, agent_type: str) -> MessageSource:
+        if agent_type not in self.sources:
+            self.sources[agent_type] = MessageSourceImpl(agent_type, queue_size=50)
+        return self.sources[agent_type]
+
+    async def post_message(self, msg: Message):
+        agent_type = msg.receiver.agent_type
+        source = await self.get_or_create_source(agent_type)
+        await source.post_message(msg)
