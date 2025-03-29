@@ -2,6 +2,7 @@ import asyncio
 from typing import Dict, List
 
 from langchain_core.tools import BaseTool
+
 from spade_llm.platform.api import (
     AgentHandler,
     AgentPlatform,
@@ -9,7 +10,6 @@ from spade_llm.platform.api import (
     MessageService,
     MessageSource,
     StorageFactory,
-    Message,
 )
 from spade_llm.platform.context import AgentContextImpl
 
