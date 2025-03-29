@@ -6,6 +6,8 @@ from langchain_core.messages import ToolCall
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from .prefixkeyvaluestorage import PrefixKeyValueStorage
+
 class AgentId(BaseModel):
     agent_type: str = Field(description="Name of the agent type used to route message to a proper system."
                                         "Agent of the same type has the same code base and instruction, but might"
@@ -17,14 +19,14 @@ class AgentId(BaseModel):
 class Message(BaseModel):
     sender: AgentId = Field(description="Who sent this message.")
     receiver: AgentId = Field(description="To whom this message id sent.")
-    thread_id: Optional[uuid.uuid4] = Field(description="Id of the conversation message belongs to.", default=None)
+    thread_id: Optional[uuid.UUID] = Field(description="Id of the conversation message belongs to.", default=None)
     performative: str = Field(description="What does the sender mean by this message. Is it a request or just an information.")
     metadata: dict[str, str] = Field(description="Arbitrary extra information about message.", default=dict())
     #TODO: Allow for typed content with raw nested JSON
     content: str = Field(description="Content of the message")
 
 
-class KeyValueStorage:
+class KeyValueStorage(metaclass=ABCMeta):
     @abstractmethod
     async def get_item(self, key: str) -> str:
         """
@@ -34,7 +36,7 @@ class KeyValueStorage:
         pass
 
     @abstractmethod
-    async def put_item(self, key: str, value: Optional[str]):
+    async def put_item(self, key: str, value: Optional[str]) -> None:
         """
         Sets a new value for an item in agent key/value store
         :param key: Key of the item to set or update
@@ -43,7 +45,7 @@ class KeyValueStorage:
         pass
 
 
-class AgentContext(ABCMeta, KeyValueStorage):
+class AgentContext(metaclass=ABCMeta, ):
     """
     Provides information for an agent about current context, including access to the agent's key/value
     storage, thread (conversation) context, adds ability to send messages, start and stop threads and
@@ -61,7 +63,7 @@ class AgentContext(ABCMeta, KeyValueStorage):
 
     @property
     @abstractmethod
-    def thread_id(self) -> Optional[uuid.uuid4]:
+    def thread_id(self) -> Optional[uuid.UUID]:
         """
         Thread this context belongs to. Agent can handle multiple threads simultaneously, but
         each message belong to at most one thread. Thread also has an associated key/value cache
@@ -72,14 +74,15 @@ class AgentContext(ABCMeta, KeyValueStorage):
     @property
     def has_thread(self) -> bool:
         """
-        :return: Whenever this context has a thread associated
+        :return: Whether this context has a thread associated
         """
         return self.thread_id is not None
 
     @property
-    @abstractmethod
     def thread_context(self) -> KeyValueStorage:
-        pass
+        if self.has_thread:
+            return PrefixKeyValueStorage(wrapped_storage=self, prefix=str(self.thread_id))
+        raise RuntimeError("Thread context unavailable because there's no active thread.")
 
     @abstractmethod
     async def fork_thread(self) -> "AgentContext":
@@ -114,7 +117,7 @@ class AgentContext(ABCMeta, KeyValueStorage):
         pass
 
 
-class AgentHandler(ABCMeta):
+class AgentHandler(metaclass=ABCMeta):
     """
     Interface provided by the agent to integrate with platform.
     """
@@ -137,7 +140,8 @@ class AgentHandler(ABCMeta):
         """
         pass
 
-class AgentPlatform(ABCMeta):
+
+class AgentPlatform(metaclass=ABCMeta):
     """
     Abstraction of an agent platform. Allows to add agents with their handlers and accessible tools
     """
