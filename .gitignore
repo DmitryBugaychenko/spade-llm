@@ -170,3 +170,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 /spade_llm/demo/server.db
+.aider*

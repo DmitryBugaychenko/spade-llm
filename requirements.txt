@@ -16,3 +16,4 @@ urllib3~=2.3.0
 numpy~=1.26.4
 pandas~=2.0.3
 slixmpp~=1.8.5
+requests~=2.32.3
