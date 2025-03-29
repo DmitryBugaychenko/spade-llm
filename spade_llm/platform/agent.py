@@ -116,12 +116,6 @@ class PerformativeDispatcher(MessageHandler):
             for beh in self.behaviors_by_performative[performative]:
                 if beh.template.match(msg):
                     return beh
-        else:
-            # Check for behaviors without specific performative
-            if None in self.behaviors_by_performative:
-                for beh in self.behaviors_by_performative[None]:
-                    if beh.template.match(msg):
-                        return beh
         return None
 
     async def handle_message(self, context: AgentContext, message: Message):
