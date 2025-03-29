@@ -1,5 +1,5 @@
 import unittest
-from spade_llm.platform.storage import InMemoryKeyValueStorage, PrefixKeyValueStorage
+from spade_llm.platform.storage import InMemoryKeyValueStorage, PrefixKeyValueStorage, TransientKeyValueStorage
 
 class TestPrefixKeyValueStorage(unittest.IsolatedAsyncioTestCase):
     async def test_get_item(self):
@@ -46,6 +46,28 @@ class TestPrefixKeyValueStorage(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
         result = await memory_storage.get_item('test:key2')
         self.assertIsNone(result)
+
+class TestTransientKeyValueStorage(unittest.IsolatedAsyncioTestCase):
+    async def test_transient_behavior(self):
+        memory_storage = InMemoryKeyValueStorage()
+        transient_storage = TransientKeyValueStorage(memory_storage)
+        
+        await transient_storage.put_item('key1', 'value1')
+        await transient_storage.put_item('key2', 'value2')
+        
+        result1 = await transient_storage.get_item('key1')
+        result2 = await transient_storage.get_item('key2')
+        
+        self.assertEqual(result1, 'value1')
+        self.assertEqual(result2, 'value2')
+        
+        await transient_storage.close()
+        
+        result_after_closing_1 = await transient_storage.get_item('key1')
+        result_after_closing_2 = await transient_storage.get_item('key2')
+        
+        self.assertIsNone(result_after_closing_1)
+        self.assertIsNone(result_after_closing_2)
 
 if __name__ == "__main__":
     unittest.main()
