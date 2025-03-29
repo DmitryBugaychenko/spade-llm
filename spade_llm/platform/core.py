@@ -72,7 +72,7 @@ class PrefixKeyValueStorage(KeyValueStorage):
 class MessageSourceImpl(MessageSource):
     """Concrete implementation of MessageSource using asyncio.Queue."""
 
-    def __init__(self, agent_type: str, queue_size: int):
+    def __init__(self, agent_type: str, queue_size: int = 50):  # Added optional constructor param
         self._agent_type = agent_type
         self.queue = asyncio.Queue(maxsize=queue_size)
         self.shutdown_event = asyncio.Event()
@@ -112,10 +112,12 @@ class DictionaryMessageService(MessageService):
 
     async def get_or_create_source(self, agent_type: str) -> MessageSource:
         if agent_type not in self.sources:
-            self.sources[agent_type] = MessageSourceImpl(agent_type, queue_size=50)
+            self.sources[agent_type] = MessageSourceImpl(agent_type)
         return self.sources[agent_type]
 
     async def post_message(self, msg: Message):
         agent_type = msg.receiver.agent_type
-        source = await self.get_or_create_source(agent_type)
+        if agent_type not in self.sources:
+            raise Exception(f"No message source found for agent type '{agent_type}'")  # Threw exception when source not found
+        source = self.sources[agent_type]
         await source.post_message(msg)
