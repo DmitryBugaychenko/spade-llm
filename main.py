@@ -5,6 +5,10 @@ from spade_llm.platform.storage import InMemoryStorageFactory
 from spade_llm.platform.messaging import DictionaryMessageService
 
 class EchoAgentHandler(AgentHandler):
+    @property
+    def agent_type(self) -> str:
+        return "echo"
+
     async def handle_message(self, context, message: Message):
         print(f"EchoAgent received message: {message.content}")
 
