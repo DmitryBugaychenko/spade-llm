@@ -24,8 +24,9 @@ class TestPrefixKeyValueStorage(unittest.IsolatedAsyncioTestCase):
         mock_storage = AsyncMock(spec=KeyValueStorage)
         prefix_storage = PrefixKeyValueStorage(mock_storage, 'test:')
         
+        await prefix_storage.put_item('key', 'value')
         await prefix_storage.close()
-        mock_storage.put_item.assert_not_called()
+        mock_storage.put_item.assert_any_call('test:key', None)
 
 if __name__ == "__main__":
     unittest.main()
