@@ -25,9 +25,15 @@ class TestThreadDispatcher(unittest.TestCase):
 
     def test_find_matching_behaviour(self):
         self.dispatcher.add_behaviour(self.behavior_mock_1)
-        sender_id = AgentId("sender@example.com")
-        receiver_id = AgentId("receiver@example.com")
-        msg = Message(sender=sender_id, receiver=receiver_id, body="Test message", thread_id=self.thread_id_1)
+        sender_id = AgentId(agent_type='test-sender', agent_id='sender-agent')
+        receiver_id = AgentId(agent_type='test-receiver', agent_id='receiver-agent')
+        msg = Message(
+            sender=sender_id,
+            receiver=receiver_id,
+            body="Test message",
+            thread_id=self.thread_id_1,
+            performative="inform"
+        )
         result = self.dispatcher.find_matching_behaviour(msg)
         self.assertIs(result, self.behavior_mock_1)
 
