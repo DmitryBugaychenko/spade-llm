@@ -9,9 +9,10 @@ from spade_llm.platform.api import (
     MessageService,
     MessageSource,
     StorageFactory,
-    AgentContextImpl,
     Message,
 )
+from spade_llm.platform.context import AgentContextImpl
+
 
 class AgentPlatformImpl(AgentPlatform):
     def __init__(self, storage_factory: StorageFactory, message_service: MessageService):
