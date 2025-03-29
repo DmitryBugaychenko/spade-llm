@@ -1,12 +1,11 @@
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Any
+from typing import Optional
 
-from langchain_core.messages import ToolCall
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from .prefixkeyvaluestorage import PrefixKeyValueStorage
+import spade_llm.platform.core as core
 
 class AgentId(BaseModel):
     agent_type: str = Field(description="Name of the agent type used to route message to a proper system."
@@ -44,8 +43,72 @@ class KeyValueStorage(metaclass=ABCMeta):
         """
         pass
 
+class MessageSource(metaclass=ABCMeta):
+    """
+    Allows agents to asynchronously fetch messages for certain agent type.
+    """
+    @property
+    @abstractmethod
+    def agent_type(self)  -> str:
+        """
+        Name of the agent type this queue belongs to. Only messages for agents of this type
+        fetched from this queue
+        """
+        pass
 
-class AgentContext(metaclass=ABCMeta, ):
+    @abstractmethod
+    async def fetch_message(self) -> Optional[Message]:
+        """
+        Fetches a next message from the queue. Returns a message or None if the queue is drained.
+        """
+        pass
+
+    @abstractmethod
+    async def message_handled(self):
+        """
+        Notifies queue that the message has been handled.
+        """
+        pass
+
+    @abstractmethod
+    async def shutdown(self):
+        """
+        Notifies queue that it is being shutdown. Messages currently in the queue should be processed,
+        but no more new message should arrive.
+        """
+        pass
+
+    @abstractmethod
+    async def join(self):
+        """
+        Wait for the queue to shut down.
+        :return:
+        """
+        pass
+
+class MessageService(metaclass=ABCMeta):
+    """
+    Allows agents to connect to the message sources and to send messages
+    """
+    @abstractmethod
+    async def get_or_create_source(self, agent_type: str) -> MessageSource:
+        """
+        Creates or returns previously created message source for agent type
+        :param agent_type: Agent type to get messages for
+        :return: Message source to consume messages from.
+        """
+        pass
+
+    @abstractmethod
+    async def post_message(self, msg: Message):
+        """
+        Posts a new message in one of registered message sources.
+        :param msg: Message to put.
+        """
+        pass
+
+
+class AgentContext(KeyValueStorage, metaclass=ABCMeta):
     """
     Provides information for an agent about current context, including access to the agent's key/value
     storage, thread (conversation) context, adds ability to send messages, start and stop threads and
@@ -81,7 +144,7 @@ class AgentContext(metaclass=ABCMeta, ):
     @property
     def thread_context(self) -> KeyValueStorage:
         if self.has_thread:
-            return PrefixKeyValueStorage(wrapped_storage=self, prefix=str(self.thread_id))
+            return core.PrefixKeyValueStorage(wrapped_storage=self, prefix=str(self.thread_id))
         raise RuntimeError("Thread context unavailable because there's no active thread.")
 
     @abstractmethod
