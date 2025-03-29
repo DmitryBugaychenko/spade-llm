@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
-from spade_llm.platform.agent import ThreadDispatcher, MessageTemplate, Message, Behaviour
+from spade_llm.platform.api import AgentId, Message
+from spade_llm.platform.agent import ThreadDispatcher, MessageTemplate, Behaviour
 
 class TestThreadDispatcher(unittest.TestCase):
     def setUp(self):
@@ -24,9 +25,10 @@ class TestThreadDispatcher(unittest.TestCase):
 
     def test_find_matching_behaviour(self):
         self.dispatcher.add_behaviour(self.behavior_mock_1)
-        mock_msg = MagicMock(spec=Message)
-        mock_msg.thread_id = self.thread_id_1
-        result = self.dispatcher.find_matching_behaviour(mock_msg)
+        sender_id = AgentId("sender@example.com")
+        receiver_id = AgentId("receiver@example.com")
+        msg = Message(sender=sender_id, receiver=receiver_id, body="Test message", thread_id=self.thread_id_1)
+        result = self.dispatcher.find_matching_behaviour(msg)
         self.assertIs(result, self.behavior_mock_1)
 
     def test_is_empty(self):
