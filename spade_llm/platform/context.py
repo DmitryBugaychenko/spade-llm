@@ -8,7 +8,7 @@ from .api import KeyValueStorage, MessageService, Message, AgentContext
 from .core import PrefixKeyValueStorage
 
 
-class ConcreteAgentContext(AgentContext):
+class AgentContextImpl(AgentContext):
     def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService):
         self.kv_store = kv_store
         self.agent_id = agent_id
@@ -45,12 +45,12 @@ class ConcreteAgentContext(AgentContext):
             return self._thread_kv_store
         raise RuntimeError("Thread context unavailable because there's no active thread.")
 
-    async def fork_thread(self) -> "ConcreteAgentContext":
+    async def fork_thread(self) -> "AgentContextImpl":
         new_thread_id = UUID(int=getrandbits(128)) 
-        new_context = ConcreteAgentContext(self.kv_store, self.agent_id, new_thread_id, self.message_service)
+        new_context = AgentContextImpl(self.kv_store, self.agent_id, new_thread_id, self.message_service)
         return new_context
 
-    async def close_thread(self) -> "ConcreteAgentContext":
+    async def close_thread(self) -> "AgentContextImpl":
         if self._thread_kv_store:
             await self._thread_kv_store.close()
             self._thread_kv_store = None
