@@ -1,7 +1,9 @@
+import asyncio
+from typing import Optional
+
 from pydantic import BaseModel
 from spade_llm.platform.api import (
     KeyValueStorage,
-    AgentContext,
     MessageSource,
     Message,
 )
@@ -70,7 +72,7 @@ class MessageSourceImpl(MessageSource):
     """Concrete implementation of MessageSource using asyncio.Queue."""
 
     def __init__(self, agent_type: str, queue_size: int):
-        self.agent_type = agent_type
+        self._agent_type = agent_type
         self.queue = asyncio.Queue(maxsize=queue_size)
         self.shutdown_event = asyncio.Event()
 
@@ -79,8 +81,6 @@ class MessageSourceImpl(MessageSource):
         return self._agent_type
 
     async def fetch_message(self) -> Optional[Message]:
-        if self.shutdown_event.is_set():
-            return None
         try:
             return await self.queue.get()
         except asyncio.CancelledError:
@@ -99,3 +99,7 @@ class MessageSourceImpl(MessageSource):
     async def post_message(self, message: Message):
         if not self.shutdown_event.is_set():
             await self.queue.put(message)
+
+    @agent_type.setter
+    def agent_type(self, value):
+        self._agent_type = value
