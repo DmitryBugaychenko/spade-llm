@@ -15,12 +15,12 @@ class TestThreadDispatcher(unittest.TestCase):
         self.behavior_mock_2.template = self.msg_template_2
 
     def test_add_and_remove_behaviour(self):
-        self.assertEqual(len(self.dispatcher.dispatchers_by_thread), 0)
+        self.assertEqual(len(self.dispatcher._dispatchers_by_thread), 0)
         self.dispatcher.add_behaviour(self.behavior_mock_1)
-        self.assertIn(self.thread_id_1, self.dispatcher.dispatchers_by_thread)
-        self.assertEqual(len(self.dispatcher.dispatchers_by_thread[self.thread_id_1]._behaviors_by_performative.get(None)), 1)
+        self.assertIn(self.thread_id_1, self.dispatcher._dispatchers_by_thread)
+        self.assertEqual(len(self.dispatcher._dispatchers_by_thread[self.thread_id_1]._behaviors_by_performative.get(None)), 1)
         self.dispatcher.remove_behaviour(self.behavior_mock_1)
-        self.assertNotIn(self.thread_id_1, self.dispatcher.dispatchers_by_thread)
+        self.assertNotIn(self.thread_id_1, self.dispatcher._dispatchers_by_thread)
 
     def test_find_matching_behaviour(self):
         self.dispatcher.add_behaviour(self.behavior_mock_1)
@@ -30,11 +30,11 @@ class TestThreadDispatcher(unittest.TestCase):
         self.assertIs(result, self.behavior_mock_1)
 
     def test_is_empty(self):
-        self.assertTrue(self.dispatcher.is_empty())
+        self.assertTrue(self.dispatcher.is_empty)
         self.dispatcher.add_behaviour(self.behavior_mock_1)
-        self.assertFalse(self.dispatcher.is_empty())
+        self.assertFalse(self.dispatcher.is_empty)
         self.dispatcher.remove_behaviour(self.behavior_mock_1)
-        self.assertTrue(self.dispatcher.is_empty())
+        self.assertTrue(self.dispatcher.is_empty)
 
 if __name__ == "__main__":
     unittest.main()
