@@ -102,6 +102,8 @@ class PerformativeDispatcher(MessageHandler):
         performative = beh.template.performative
         if performative in self.behaviors_by_performative:
             self.behaviors_by_performative[performative].remove(beh)
+            if not self.behaviors_by_performative[performative]:  
+                del self.behaviors_by_performative[performative]
 
     @property
     def is_empty(self) -> bool:
