@@ -31,7 +31,7 @@ class TestThreadDispatcher(unittest.TestCase):
         msg = Message(
             sender=sender_id,
             receiver=receiver_id,
-            body="Test message",
+            content="Test message",
             thread_id=self.thread_id_1,
             performative="inform"
         )

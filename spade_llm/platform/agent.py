@@ -160,6 +160,11 @@ class PerformativeDispatcher(MessageDispatcher):
             for beh in self._behaviors_by_performative[performative]:
                 if beh.template.match(msg):
                     return beh
+        # Check behaviours without performative specified if not found
+        if None in self._behaviors_by_performative:
+            for beh in self._behaviors_by_performative[None]:
+                if beh.template.match(msg):
+                    return beh
         return None
 
 
@@ -204,6 +209,8 @@ class ThreadDispatcher(MessageDispatcher):
         thread_id = msg.thread_id
         if thread_id in self._dispatchers_by_thread:
             return self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg)
+        if None in self._dispatchers_by_thread:
+            return self._dispatchers_by_thread[None].find_matching_behaviour(msg)
         return None
 
     @property

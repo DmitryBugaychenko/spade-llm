@@ -198,7 +198,22 @@ class AgentContext(KeyValueStorage, metaclass=ABCMeta):
         """
         pass
 
-class AgentHandler(metaclass=ABCMeta):
+
+class MessageHandler:
+    """
+    Abstraction for the entity capable of handling messages
+    """
+    @abstractmethod
+    async def handle_message(self, context: AgentContext, message: Message):
+        """
+        Handles a single message addressed to a particular agent in a particular thread (optional).
+        :param context: Context with access to key/value storage and tool calling.
+        :param message: Message to handle.
+        """
+        pass
+
+
+class AgentHandler(MessageHandler, metaclass=ABCMeta):
     """
     Interface provided by the agent to integrate with the platform.
     """
@@ -211,14 +226,6 @@ class AgentHandler(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
-    async def handle_message(self, context: AgentContext, message: Message):
-        """
-        Handles a single message addressed to a particular agent in a particular thread (optional).
-        :param context: Context with access to key/value storage and tool calling.
-        :param message: Message to handle.
-        """
-        pass
 
 class AgentPlatform(metaclass=ABCMeta):
     """
