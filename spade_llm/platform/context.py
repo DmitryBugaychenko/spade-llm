@@ -47,11 +47,12 @@ class ConcreteAgentContext(AgentContext):
         return self
 
     async def send(self, message: Message):
-        await self.message_service.send_message(message)
+        await self.message_service.post_message(message)
 
     @property
     def tools(self) -> List[BaseTool]:
         return self.tools
 
-    def add_tool(self, tool: BaseTool):
-        self.tools.append(tool)
+    @tools.setter
+    def tools(self, value):
+        self._tools = value
