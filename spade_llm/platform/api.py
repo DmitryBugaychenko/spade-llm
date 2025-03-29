@@ -1,5 +1,3 @@
-# spade_llm/platform/api.py
-
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Optional
@@ -8,7 +6,6 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
 import spade_llm.platform.core as core
-import asyncio
 
 class AgentId(BaseModel):
     agent_type: str = Field(description="Name of the agent type used to route message to a proper system."
@@ -213,37 +210,3 @@ class AgentPlatform(metaclass=ABCMeta):
         :param tools: Tools available for the agent.
         """
         pass
-
-class MessageSourceImpl(MessageSource):
-    """Concrete implementation of MessageSource using asyncio.Queue."""
-
-    def __init__(self, agent_type: str, queue_size: int):
-        self.agent_type = agent_type
-        self.queue = asyncio.Queue(maxsize=queue_size)
-        self.shutdown_event = asyncio.Event()
-
-    @property
-    def agent_type(self) -> str:
-        return self._agent_type
-
-    async def fetch_message(self) -> Optional[Message]:
-        if self.shutdown_event.is_set():
-            return None
-        try:
-            return await self.queue.get()
-        except asyncio.CancelledError:
-            return None
-
-    async def message_handled(self):
-        self.queue.task_done()
-
-    async def shutdown(self):
-        self.shutdown_event.set()
-        await self.join()
-
-    async def join(self):
-        await self.queue.join()
-
-    async def post_message(self, message: Message):
-        if not self.shutdown_event.is_set():
-            await self.queue.put(message)
