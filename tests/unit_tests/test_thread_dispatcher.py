@@ -2,12 +2,13 @@ import unittest
 from unittest.mock import MagicMock
 from spade_llm.platform.api import AgentId, Message
 from spade_llm.platform.agent import ThreadDispatcher, MessageTemplate, Behaviour
+import uuid
 
 class TestThreadDispatcher(unittest.TestCase):
     def setUp(self):
         self.dispatcher = ThreadDispatcher()
-        self.thread_id_1 = 'thread-id-1'
-        self.thread_id_2 = 'thread-id-2'
+        self.thread_id_1 = uuid.uuid4()  # Use UUID instead of string
+        self.thread_id_2 = uuid.uuid4()
         self.msg_template_1 = MessageTemplate(thread_id=self.thread_id_1)
         self.msg_template_2 = MessageTemplate(thread_id=self.thread_id_2)
         self.behavior_mock_1 = MagicMock(spec=Behaviour)
