@@ -1,13 +1,13 @@
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, Dict, List, Optional
 
 from spade_llm.platform.api import MessageHandler, Message, AgentContext
 
 
 class MessageTemplate:
     """
-    Templates are used to filter messages and dispatch them to proper behaviour
+    Templates are used to filter messages and dispatch them to proper behavior
     """
     def __init__(self, 
                  thread_id: Optional[uuid.UUID] = None, 
@@ -70,43 +70,67 @@ class Behaviour(MessageHandler, metaclass=ABCMeta):
     @abstractmethod
     def is_done(self) -> bool:
         """
-        Returns true if behaviour is completed and should not accept messages any more and false otherwise
+        Returns true if behavior is completed and should not accept messages anymore and false otherwise
         """
         pass
+
 
 class PerformativeDispatcher(MessageHandler):
     """
-    Stores behaviours grouped by performative configured in their template. Uses dictionary with performative
-    as a key and list of behaviours as values plus extra list for behaviours without performative specified
+    Stores behaviors grouped by performative configured in their templates. Uses dictionary with performative
+    as a key and list of behaviors as values plus extra list for behaviors without performative specified.
     """
 
+    def __init__(self):
+        self.behaviors_by_performative: Dict[Optional[str], List[Behaviour]] = {}
+    
     def add_behaviour(self, beh: Behaviour):
         """
-        Add behaviour to dispatch list
-        :param beh: Behaviour to add.
+        Add behavior to dispatch list.
+        :param beh: Behavior to add.
         """
-        pass
+        performative = beh.template.performative
+        if performative not in self.behaviors_by_performative:
+            self.behaviors_by_performative[performative] = []
+        self.behaviors_by_performative[performative].append(beh)
 
     def remove_behaviour(self, beh: Behaviour):
         """
-        Removes behaviour from dispatch
-        :param beh: Behaviour to remove.
+        Removes behavior from dispatch.
+        :param beh: Behavior to remove.
         """
-        pass
+        performative = beh.template.performative
+        if performative in self.behaviors_by_performative:
+            self.behaviors_by_performative[performative].remove(beh)
 
     @property
     def is_empty(self) -> bool:
-        """Returns true if there are no behaviours"""
-        pass
+        """Returns true if there are no behaviors."""
+        return len(self.behaviors_by_performative) == 0
 
     def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
-        """Lookups for behaviour matching given message, first select proper list based on performative,
-        then find the first one with matching template"""
-        pass
+        """Lookups for behavior matching given message, first selects proper list based on performative,
+        then finds the first one with matching template."""
+        performative = msg.performative
+        if performative in self.behaviors_by_performative:
+            for beh in self.behaviors_by_performative[performative]:
+                if beh.template.match(msg):
+                    return beh
+        else:
+            # Check for behaviors without specific performative
+            if None in self.behaviors_by_performative:
+                for beh in self.behaviors_by_performative[None]:
+                    if beh.template.match(msg):
+                        return beh
+        return None
 
     async def handle_message(self, context: AgentContext, message: Message):
         """
-        Tries to find behaviour matching message and pass message to it. After that check is behaviour is
+        Tries to find behavior matching message and passes message to it. Afterward checks if behavior is
         done and if so removes it.
         """
-        pass
+        matched_behavior = self.find_matching_behaviour(message)
+        if matched_behavior:
+            await matched_behavior.handle_message(context, message)
+            if matched_behavior.is_done():
+                self.remove_behaviour(matched_behavior)
