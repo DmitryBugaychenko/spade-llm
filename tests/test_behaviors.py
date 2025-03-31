@@ -8,6 +8,7 @@ from spade_llm.platform.behaviors import (
     Message,
     ReceiverBehavior, MessageHandlingBehavior,
 )
+from spade_llm.platform.api import AgentId
 
 class MockAgent(BehaviorsOwner):
     received_behaviour: MessageHandlingBehavior
@@ -67,7 +68,9 @@ class TestBehaviours(unittest.TestCase):
     def test_receive_method(self):
         # Prepare mocks and variables
         template = MessageTemplate(performative="inform")
-        message = Message( performative="inform", content="Test message")
+        sender_id = AgentId("sender_1")
+        receiver_id = AgentId("receiver_1")
+        message = Message(sender=sender_id, receiver=receiver_id, performative="inform", content="Test message")
 
         # Run the test
         result: Message = asyncio.run(self.receive_and_wait(template, message))
