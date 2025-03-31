@@ -1,121 +1,25 @@
 import asyncio
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from spade_llm.platform.api import MessageHandler, Message
+from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior
 
-
-class MessageTemplate:
-    """
-    Templates are used to filter messages and dispatch them to proper behavior
-    """
-    def __init__(self, 
-                 thread_id: Optional[uuid.UUID] = None, 
-                 performative: Optional[str] = None,
-                 validator: Optional[Callable[[Message], bool]] = None):
-        """
-        Initializes the MessageTemplate with optional thread_id, performative, and validator.
-        
-        Args:
-            thread_id (Optional[uuid.UUID], optional): The thread identifier. Defaults to None.
-            performative (Optional[str], optional): The performative string. Defaults to None.
-            validator (Optional[Callable[[Message], bool]], optional): Lambda function validating the message. Defaults to None.
-        """
-        self._thread_id = thread_id
-        self._performative = performative
-        self._validator = validator
-
-    @property
-    def thread_id(self) -> Optional[uuid.UUID]:
-        """
-        Gets the thread id if provided.
-        """
-        return self._thread_id
-
-    @property
-    def performative(self) -> Optional[str]:
-        """
-        Gets the performative if provided.
-        """
-        return self._performative
-
-    def match(self, msg: Message) -> bool:
-        """
-        Checks whether the given message matches this template.
-        
-        Args:
-            msg (Message): The message to check.
-            
-        Returns:
-            bool: True if the message matches the template, False otherwise.
-        """
-        if self._thread_id is not None and msg.thread_id != self._thread_id:
-            return False
-        if self._performative is not None and msg.performative != self._performative:
-            return False
-        if self._validator is not None and not self._validator(msg):
-            return False
-        return True
 
 class Agent(MessageHandler, metaclass=ABCMeta):
     """
     Base class for all agents. Provide asyncio event loop for execution, adds and removes
     behaviors, handle messages by dispatching them to interested behaviours
     """
+    @property
+    @abstractmethod
     def loop(self) -> asyncio.AbstractEventLoop:
         pass
 
-class Behaviour(metaclass=ABCMeta):
-    """
-    Reusable code block for the agent, consumes a message matching certain template and
-    handles it
-    """
-    _agent: Agent
-
-    def setup(self, agent: Agent):
-        """
-        Setup method to initialize the behavior with its associated agent.
-        """
-        self._agent = agent
-
-    @property
-    def agent(self) -> Agent:
-        """
-        Readonly property returning the associated agent.
-        """
-        return self._agent
-
     @abstractmethod
-    def is_done(self) -> bool:
-        """
-        Returns true if behavior is completed and should not accept messages anymore and false otherwise
-        """
-
-class MessageHandlingBehavior(Behaviour, MessageHandler, metaclass=ABCMeta):
-    """
-    Behaviour used to wait for messages. Does not schedule execution, waits until
-    proper message is dispatched
-    """
-
-    @property
-    @abstractmethod
-    def template(self) -> MessageTemplate:
-        """Template used to get messages for this behavior"""
-
-
-
-# TODO: Do not remove, will evolve later
-# class CyclicBehaviour(Behaviour, metaclass=ABCMeta):
-#     """Cyclic behaviour which is never done."""
-#     def is_done(self) -> bool:
-#         return False
-#
-# class OneShotBehaviour(Behaviour, metaclass=ABCMeta):
-#     """One shot behaviour is done after first execution."""
-#     def is_done(self) -> bool:
-#         return True
-
+    def remove_behaviour(self, beh: Behaviour):
+        pass
 
 class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
     @abstractmethod

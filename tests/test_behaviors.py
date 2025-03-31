@@ -1,12 +1,11 @@
 import asyncio
 import unittest
-from unittest.mock import MagicMock, patch
 from spade_llm.platform.behaviors import (
     Behaviour,
     BehaviorsOwner,
     MessageTemplate,
     Message,
-    ReceiverBehavior, MessageHandlingBehavior,
+    MessageHandlingBehavior,
 )
 from spade_llm.platform.api import AgentId
 
@@ -21,6 +20,7 @@ class MockAgent(BehaviorsOwner):
 
     def add_behaviour(self, beh: Behaviour):
         self.received_behaviour = beh
+        beh.setup(self)
 
 class CounterBehavior(Behaviour):
     def __init__(self):
@@ -40,10 +40,10 @@ class TestBehaviours(unittest.TestCase):
         agent = MockAgent()
 
         # Set up behavior with agent
-        await behavior.setup(agent)
+        behavior.setup(agent)
 
         # Schedule execution manually
-        await behavior.start()
+        behavior.start()
 
         # Wait for completion
         await behavior.join()
@@ -57,19 +57,11 @@ class TestBehaviours(unittest.TestCase):
         # Check final counter value
         self.assertEqual(behavior.counter, 3)
 
-    async def mock_post_message(self, message: Message):
-        """Simulate posting a message"""
-        agent = MockAgent()
-        receiver = ReceiverBehavior(message.template)
-        agent.add_behaviour(receiver)
-        await receiver.handle_message(None, message)
-        await receiver.join()
-
     def test_receive_method(self):
         # Prepare mocks and variables
         template = MessageTemplate(performative="inform")
-        sender_id = AgentId("sender_1")
-        receiver_id = AgentId("receiver_1")
+        sender_id = AgentId(agent_type='test-sender', agent_id='sender-agent')
+        receiver_id = AgentId(agent_type='test-receiver', agent_id='receiver-agent')
         message = Message(sender=sender_id, receiver=receiver_id, performative="inform", content="Test message")
 
         # Run the test
@@ -79,10 +71,10 @@ class TestBehaviours(unittest.TestCase):
 
     async def receive_and_wait(self, template: MessageTemplate, expected_message: Message):
         agent = MockAgent()
-        behavior = Behaviour()
-        await behavior.setup(agent)
+        behavior = CounterBehavior()
+        behavior.setup(agent)
 
-        task = asyncio.create_task(behavior.receive(template, timeout=5))  # Start receiving task
+        task = asyncio.create_task(behavior.receive(template, timeout=5000))  # Start receiving task
 
         # Simulate sending the message after a delay
         await asyncio.sleep(0.1)

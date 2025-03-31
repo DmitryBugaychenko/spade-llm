@@ -26,112 +26,6 @@ class BehaviorsOwner(metaclass=ABCMeta):
     def add_behaviour(self, beh: "Behaviour"):
         pass
 
-
-class Behaviour(metaclass=ABCMeta):
-    """
-    Reusable code block for the agent, consumes a message matching certain template and
-    handles it
-    """
-    _agent: BehaviorsOwner
-    _completion_event = asyncio.Event()
-
-    @property
-    def agent(self) -> BehaviorsOwner:
-        """
-        Readonly property returning the associated agent.
-        """
-        return self._agent
-
-    async def setup(self, agent: BehaviorsOwner):
-        """
-        Setup method to initialize the behavior with its associated agent.
-        """
-        self._agent = agent
-
-    async def start(self):
-        """
-        Start behavior by scheduling its execution
-        """
-        self.schedule_execution()
-
-    def schedule_execution(self):
-        """
-        Schedules execution using agents event loop
-        """
-        callback = lambda: asyncio.ensure_future(self._run())
-        self.agent.loop.call_soon(callback)
-
-    async def step(self):
-        """
-        Executes a single step of this behaviour. Steps should not block for IO (use asyncio instead),
-        nor perform long computations (offload them using an executor).
-        """
-
-    async def _run(self):
-        """
-        Internal method, executes single step and then either removes behavior or schedules next
-        execution depending on whether behavior is done or not.
-        """
-        await self.step()
-        if self.is_done():
-            self._completion_event.set()
-            self.agent.remove_behaviour(self)
-        else:
-            self.schedule_execution()
-
-    async def join(self):
-        """
-        Waits for the behavior to complete before continuing.
-        """
-        await self._completion_event.wait()
-
-    @abstractmethod
-    def is_done(self) -> bool:
-        """
-        Returns True if behavior is completed and should not accept messages anymore,
-        False otherwise.
-        """
-    
-    async def receive(self, template: MessageTemplate, timeout: float) -> Optional[Message]:
-        """
-        Creates a ReceiverBehavior and waits for a message matching the template within the timeout.
-        
-        Parameters:
-            template (MessageTemplate): The template to match against incoming messages.
-            timeout (float): Time limit in seconds to wait for a matching message.
-            
-        Returns:
-            Optional[Message]: The received message if one arrives within the timeout, otherwise None.
-        """
-        receiver = ReceiverBehavior(template)
-        self.agent.add_behaviour(receiver)
-        
-        try:
-            await asyncio.wait_for(receiver.join(), timeout)
-            return receiver.message
-        except asyncio.TimeoutError:
-            self.agent.remove_behaviour(receiver)
-            return None
-
-
-class ContextBehaviour(Behaviour, metaclass=ABCMeta):
-    """
-    This implementation provides access to agent context for the behavior.
-    """
-    _context: AgentContext
-
-    @property
-    def context(self) -> AgentContext:
-        """
-        Property providing read/write access to the agent context.
-        """
-        return self._context
-
-    @context.setter
-    def context(self, value: AgentContext):
-        self._context = value
-
-
 class MessageTemplate:
     """
     Templates are used to filter messages and dispatch them to proper behavior
@@ -183,6 +77,109 @@ class MessageTemplate:
         if self._validator is not None and not self._validator(msg):
             return False
         return True
+
+class Behaviour(metaclass=ABCMeta):
+    """
+    Reusable code block for the agent, consumes a message matching certain template and
+    handles it
+    """
+    _agent: BehaviorsOwner
+
+    def __init__(self):
+        self._completion_event = asyncio.Event()
+
+    @property
+    def agent(self) -> BehaviorsOwner:
+        """
+        Readonly property returning the associated agent.
+        """
+        return self._agent
+
+    def setup(self, agent: BehaviorsOwner):
+        """
+        Setup method to initialize the behavior with its associated agent.
+        """
+        self._agent = agent
+
+    def start(self):
+        """
+        Start behavior by scheduling its execution
+        """
+        self.schedule_execution()
+
+    def schedule_execution(self):
+        """
+        Schedules execution using agents event loop
+        """
+        callback = lambda: asyncio.ensure_future(self._run())
+        self.agent.loop.call_soon(callback)
+
+    async def step(self):
+        """
+        Executes a single step of this behaviour. Steps should not block for IO (use asyncio instead),
+        nor perform long computations (offload them using an executor).
+        """
+
+    async def _run(self):
+        """
+        Internal method, executes single step and then either removes behavior or schedules next
+        execution depending on whether behavior is done or not.
+        """
+        await self.step()
+        if self.is_done():
+            self._completion_event.set()
+            self.agent.remove_behaviour(self)
+        else:
+            self.schedule_execution()
+
+    async def join(self):
+        """
+        Waits for the behavior to complete before continuing.
+        """
+        await self._completion_event.wait()
+
+    @abstractmethod
+    def is_done(self) -> bool:
+        """
+        Returns True if behavior is completed and should not accept messages anymore,
+        False otherwise.
+        """
+    
+    async def receive(self, template: MessageTemplate, timeout: float) -> Optional[Message]:
+        """
+        Waits for the message matching template for given time.
+        :param template: Template for messages to wait for
+        :param timeout: Maximum waiting time
+        :return: Message if it was received and false otherwise
+        """
+
+        receiver = ReceiverBehavior(template)
+        self.agent.add_behaviour(receiver)
+        
+        try:
+            await asyncio.wait_for(receiver.join(), timeout)
+            return receiver.message
+        except asyncio.TimeoutError:
+            self.agent.remove_behaviour(receiver)
+            return None
+
+
+class ContextBehaviour(Behaviour, metaclass=ABCMeta):
+    """
+    This implementation provides access to agent context for the behavior.
+    """
+    _context: AgentContext
+
+    @property
+    def context(self) -> AgentContext:
+        """
+        Property providing read/write access to the agent context.
+        """
+        return self._context
+
+    @context.setter
+    def context(self, value: AgentContext):
+        self._context = value
 
 
 class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMeta):

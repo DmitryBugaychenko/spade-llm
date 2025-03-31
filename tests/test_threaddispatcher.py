@@ -1,8 +1,11 @@
 import unittest
 from unittest.mock import MagicMock
 from spade_llm.platform.api import AgentId, Message
-from spade_llm.platform.agent import ThreadDispatcher, MessageTemplate, Behaviour
+from spade_llm.platform.agent import ThreadDispatcher, MessageHandlingBehavior
 import uuid
+
+from spade_llm.platform.behaviors import MessageTemplate
+
 
 class TestThreadDispatcher(unittest.TestCase):
     def setUp(self):
@@ -11,9 +14,9 @@ class TestThreadDispatcher(unittest.TestCase):
         self.thread_id_2 = uuid.uuid4()
         self.msg_template_1 = MessageTemplate(thread_id=self.thread_id_1)
         self.msg_template_2 = MessageTemplate(thread_id=self.thread_id_2)
-        self.behavior_mock_1 = MagicMock(spec=Behaviour)
+        self.behavior_mock_1 = MagicMock(spec=MessageHandlingBehavior)
         self.behavior_mock_1.template = self.msg_template_1
-        self.behavior_mock_2 = MagicMock(spec=Behaviour)
+        self.behavior_mock_2 = MagicMock(spec=MessageHandlingBehavior)
         self.behavior_mock_2.template = self.msg_template_2
 
     def test_add_and_remove_behaviour(self):

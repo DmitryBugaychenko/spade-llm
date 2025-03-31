@@ -1,8 +1,11 @@
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
-from spade_llm.platform.agent import PerformativeDispatcher, Behaviour, MessageTemplate, Message, \
+from spade_llm.platform.agent import PerformativeDispatcher, Message, \
     MessageHandlingBehavior
 from spade_llm.platform.api import AgentId
+from spade_llm.platform.behaviors import MessageTemplate
+
 
 class MockBehavior(MessageHandlingBehavior):
     def __init__(self, template: MessageTemplate):
@@ -73,7 +76,17 @@ class TestPerformativeDispatcher(unittest.TestCase):
         mock_behaviour.handle_message = AsyncMock()
         self.dispatcher.add_behaviour(mock_behaviour)
         context_mock = MagicMock()
-        message = Message(performative='test', content='')
+
+        # Use AgentId for sender and receiver
+        sender = AgentId(agent_type="TestSender", agent_id="1")
+        receiver = AgentId(agent_type="TestReceiver", agent_id="2")
+
+        message = Message(
+            sender=sender,
+            receiver=receiver,
+            performative='test',
+            content=''
+        )
         self.loop = asyncio.get_event_loop()
         self.loop.run_until_complete(self.dispatcher.handle_message(context_mock, message))
         mock_behaviour.handle_message.assert_called_once_with(context_mock, message)
