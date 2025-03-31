@@ -161,7 +161,17 @@ class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMet
     Behavior used to wait for messages. It does not schedule execution but waits until
     a suitable message is dispatched.
     """
+    _template: MessageTemplate
     _message: Optional[Message]
+
+    def __init__(self, template: MessageTemplate):
+        super().__init__()
+        self._template = template
+
+    @property
+    def template(self) -> MessageTemplate:
+        """Template used to receive messages for this behavior."""
+        return self._template
 
     @property
     def message(self) -> Optional[Message]:
@@ -169,11 +179,6 @@ class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMet
         Received message to handle or None if nothing received
         """
         return self._message
-
-    @property
-    @abstractmethod
-    def template(self) -> MessageTemplate:
-        """Template used to receive messages for this behavior."""
 
     def schedule_execution(self):
         """
