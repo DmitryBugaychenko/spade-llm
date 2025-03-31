@@ -6,10 +6,11 @@ from spade_llm.platform.behaviors import (
     BehaviorsOwner,
     MessageTemplate,
     Message,
-    ReceiverBehavior,
+    ReceiverBehavior, MessageHandlingBehavior,
 )
 
 class MockAgent(BehaviorsOwner):
+    received_behaviour: MessageHandlingBehavior
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_event_loop()
@@ -63,16 +64,15 @@ class TestBehaviours(unittest.TestCase):
         await receiver.handle_message(None, message)
         await receiver.join()
 
-    @patch('asyncio.sleep', new=lambda x: None)  # Patch sleep to speed up tests
     def test_receive_method(self):
         # Prepare mocks and variables
-        template = MessageTemplate(thread_id="test_thread", performative="inform")
-        message = Message(thread_id="test_thread", performative="inform", body="Test message")
+        template = MessageTemplate(performative="inform")
+        message = Message( performative="inform", content="Test message")
 
         # Run the test
-        result = asyncio.run(self.receive_and_wait(template, message))
+        result: Message = asyncio.run(self.receive_and_wait(template, message))
         self.assertIsNotNone(result)
-        self.assertEqual(result.body, "Test message")
+        self.assertEqual(result, message)
 
     async def receive_and_wait(self, template: MessageTemplate, expected_message: Message):
         agent = MockAgent()
@@ -82,8 +82,8 @@ class TestBehaviours(unittest.TestCase):
         task = asyncio.create_task(behavior.receive(template, timeout=5))  # Start receiving task
 
         # Simulate sending the message after a delay
-        await asyncio.sleep(1)
-        await self.mock_post_message(expected_message)
+        await asyncio.sleep(0.1)
+        await agent.received_behaviour.handle_message(None, expected_message)
 
         # Await the result of the receive call
         return await task
