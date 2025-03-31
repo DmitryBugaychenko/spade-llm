@@ -21,6 +21,10 @@ class BehaviorsOwner(metaclass=ABCMeta):
     def remove_behaviour(self, beh: "Behaviour"):
         pass
 
+    @abstractmethod
+    def add_behaviour(self, beh: "Behaviour"):
+        pass
+
 class Behaviour(metaclass=ABCMeta):
     """
     Reusable code block for the agent, consumes a message matching certain template and
