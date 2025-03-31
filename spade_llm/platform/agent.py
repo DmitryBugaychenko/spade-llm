@@ -71,6 +71,21 @@ class Behaviour(metaclass=ABCMeta):
     Reusable code block for the agent, consumes a message matching certain template and
     handles it
     """
+    _agent: Agent
+
+    def setup(self, agent: Agent):
+        """
+        Setup method to initialize the behavior with its associated agent.
+        """
+        self._agent = agent
+
+    @property
+    def agent(self) -> Agent:
+        """
+        Readonly property returning the associated agent.
+        """
+        return self._agent
+
     @abstractmethod
     def is_done(self) -> bool:
         """
