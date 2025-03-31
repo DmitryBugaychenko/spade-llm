@@ -1,8 +1,9 @@
+import asyncio
 import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Callable, Dict, List, Optional
 
-from spade_llm.platform.api import MessageHandler, Message, AgentContext
+from spade_llm.platform.api import MessageHandler, Message
 
 
 class MessageTemplate:
@@ -57,32 +58,48 @@ class MessageTemplate:
             return False
         return True
 
+class Agent(MessageHandler, metaclass=ABCMeta):
+    """
+    Base class for all agents. Provide asyncio event loop for execution, adds and removes
+    behaviors, handle messages by dispatching them to interested behaviours
+    """
+    def loop(self) -> asyncio.AbstractEventLoop:
+        pass
 
-class Behaviour(MessageHandler, metaclass=ABCMeta):
+class Behaviour(metaclass=ABCMeta):
     """
     Reusable code block for the agent, consumes a message matching certain template and
     handles it
     """
-    @property
-    @abstractmethod
-    def template(self) -> MessageTemplate:
-        """Template used to get messages for this behavior"""
-
     @abstractmethod
     def is_done(self) -> bool:
         """
         Returns true if behavior is completed and should not accept messages anymore and false otherwise
         """
 
-class CyclicBehaviour(Behaviour, metaclass=ABCMeta):
-    """Cyclic behaviour which is never done."""
-    def is_done(self) -> bool:
-        return False
+class MessageHandlingBehavior(Behaviour, MessageHandler, metaclass=ABCMeta):
+    """
+    Behaviour used to wait for messages. Does not schedule execution, waits until
+    proper message is dispatched
+    """
 
-class OneShotBehaviour(Behaviour, metaclass=ABCMeta):
-    """One shot behaviour is done after first execution."""
-    def is_done(self) -> bool:
-        return True
+    @property
+    @abstractmethod
+    def template(self) -> MessageTemplate:
+        """Template used to get messages for this behavior"""
+
+
+
+# TODO: Do not remove, will evolve later
+# class CyclicBehaviour(Behaviour, metaclass=ABCMeta):
+#     """Cyclic behaviour which is never done."""
+#     def is_done(self) -> bool:
+#         return False
+#
+# class OneShotBehaviour(Behaviour, metaclass=ABCMeta):
+#     """One shot behaviour is done after first execution."""
+#     def is_done(self) -> bool:
+#         return True
 
 
 class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
@@ -101,7 +118,7 @@ class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
+    def find_matching_behaviour(self, msg: Message) -> Optional[MessageHandlingBehavior]:
         """Lookups for behavior matching given message, first selects proper list based on performative,
         then finds the first one with matching template."""
 
@@ -129,9 +146,9 @@ class PerformativeDispatcher(MessageDispatcher):
     """
 
     def __init__(self):
-        self._behaviors_by_performative: Dict[Optional[str], List[Behaviour]] = {}
+        self._behaviors_by_performative: Dict[Optional[str], List[MessageHandlingBehavior]] = {}
     
-    def add_behaviour(self, beh: Behaviour):
+    def add_behaviour(self, beh: MessageHandlingBehavior):
         """
         Add behavior to dispatch list.
         :param beh: Behavior to add.
@@ -141,7 +158,7 @@ class PerformativeDispatcher(MessageDispatcher):
             self._behaviors_by_performative[performative] = []
         self._behaviors_by_performative[performative].append(beh)
 
-    def remove_behaviour(self, beh: Behaviour):
+    def remove_behaviour(self, beh: MessageHandlingBehavior):
         """
         Removes behavior from dispatch.
         :param beh: Behavior to remove.
@@ -152,7 +169,7 @@ class PerformativeDispatcher(MessageDispatcher):
             if not self._behaviors_by_performative[performative]:
                 del self._behaviors_by_performative[performative]
 
-    def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
+    def find_matching_behaviour(self, msg: Message) -> Optional[MessageHandlingBehavior]:
         """Lookups for behavior matching given message, first selects proper list based on performative,
         then finds the first one with matching template."""
         performative = msg.performative
@@ -181,7 +198,7 @@ class ThreadDispatcher(MessageDispatcher):
     def __init__(self):
         self._dispatchers_by_thread: Dict[Optional[uuid.UUID], PerformativeDispatcher] = {}
 
-    def add_behaviour(self, beh: Behaviour):
+    def add_behaviour(self, beh: MessageHandlingBehavior):
         """
         Add behavior to dispatch list.
         :param beh: Behavior to add.
@@ -191,7 +208,7 @@ class ThreadDispatcher(MessageDispatcher):
             self._dispatchers_by_thread[thread_id] = PerformativeDispatcher()
         self._dispatchers_by_thread[thread_id].add_behaviour(beh)
 
-    def remove_behaviour(self, beh: Behaviour):
+    def remove_behaviour(self, beh: MessageHandlingBehavior):
         """
         Removes behavior from dispatch.
         :param beh: Behavior to remove.
@@ -202,7 +219,7 @@ class ThreadDispatcher(MessageDispatcher):
             if self._dispatchers_by_thread[thread_id].is_empty:
                 del self._dispatchers_by_thread[thread_id]
 
-    def find_matching_behaviour(self, msg: Message) -> Optional[Behaviour]:
+    def find_matching_behaviour(self, msg: Message) -> Optional[MessageHandlingBehavior]:
         """
         Find matching behavior for the given message.
         """
