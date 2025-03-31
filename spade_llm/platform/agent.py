@@ -127,7 +127,7 @@ class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
         done and if so removes them.
         """
         done_behaviors = set()  # Collect behaviors marked as done
-        async for matched_behavior in self.find_matching_behaviour(message):
+        for matched_behavior in self.find_matching_behaviour(message):
             await matched_behavior.handle_message(context, message)
             if matched_behavior.is_done():
                 done_behaviors.add(matched_behavior)
@@ -170,7 +170,7 @@ class PerformativeDispatcher(MessageDispatcher):
             if not self._behaviors_by_performative[performative]:
                 del self._behaviors_by_performative[performative]
 
-    async def find_matching_behaviour(self, msg: Message):
+    def find_matching_behaviour(self, msg: Message):
         """Yields all behaviors matching the given message."""
         performative = msg.performative
         if performative in self._behaviors_by_performative:
@@ -217,16 +217,16 @@ class ThreadDispatcher(MessageDispatcher):
             if self._dispatchers_by_thread[thread_id].is_empty:
                 del self._dispatchers_by_thread[thread_id]
 
-    async def find_matching_behaviour(self, msg: Message):
+    def find_matching_behaviour(self, msg: Message):
         """
         Yields all matching behaviors for the given message.
         """
         thread_id = msg.thread_id
         if thread_id in self._dispatchers_by_thread:
-            async for beh in self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg):
+            for beh in self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg):
                 yield beh
         if None in self._dispatchers_by_thread:
-            async for beh in self._dispatchers_by_thread[None].find_matching_behaviour(msg):
+            for beh in self._dispatchers_by_thread[None].find_matching_behaviour(msg):
                 yield beh
 
     @property
