@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock
 from spade_llm.platform.agent import PerformativeDispatcher, Behaviour, MessageTemplate, Message, \
     MessageHandlingBehavior
 from spade_llm.platform.api import AgentId
-import asyncio
 
 class MockBehavior(MessageHandlingBehavior):
     def __init__(self, template: MessageTemplate):
@@ -63,19 +62,20 @@ class TestPerformativeDispatcher(unittest.TestCase):
             content=''
         )
         
-        # Manually gather results instead of using async comprehension
-        found_behaviours = asyncio.run(self.gather_async_results(self.dispatcher.find_matching_behaviour(message)))
+        # Synchronous comprehension to gather results
+        found_behaviours = [item for item in self.dispatcher.find_matching_behaviour(message)]
         self.assertEqual(len(found_behaviours), 1)
         self.assertIn(mock_behaviour, found_behaviours)
 
-    async def test_handle_message(self):
+    def test_handle_message(self):
         template = MessageTemplate(performative='test')
         mock_behaviour = MockBehavior(template)
         mock_behaviour.handle_message = AsyncMock()
         self.dispatcher.add_behaviour(mock_behaviour)
         context_mock = MagicMock()
         message = Message(performative='test', content='')
-        await self.dispatcher.handle_message(context_mock, message)
+        self.loop = asyncio.get_event_loop()
+        self.loop.run_until_complete(self.dispatcher.handle_message(context_mock, message))
         mock_behaviour.handle_message.assert_called_once_with(context_mock, message)
 
     def test_multiple_matching_behaviors(self):
@@ -92,17 +92,11 @@ class TestPerformativeDispatcher(unittest.TestCase):
         receiver = AgentId(agent_type="TestReceiver", agent_id="2")
         message = Message(sender=sender, receiver=receiver, performative='test', content='')
 
-        # Gather results manually
-        found_behaviours = asyncio.run(self.gather_async_results(self.dispatcher.find_matching_behaviour(message)))
+        # Synchronous comprehension to gather results
+        found_behaviours = [item for item in self.dispatcher.find_matching_behaviour(message)]
         self.assertEqual(len(found_behaviours), 2)
         self.assertIn(mock_behaviour_1, found_behaviours)
         self.assertIn(mock_behaviour_2, found_behaviours)
-
-    async def gather_async_results(self, async_generator):
-        result_list = []
-        async for item in async_generator:
-            result_list.append(item)
-        return result_list
 
 if __name__ == "__main__":
     unittest.main()
