@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+import asyncio
 
 from spade_llm.platform.agent import Agent, MessageTemplate
 from spade_llm.platform.api import MessageHandler, AgentContext
@@ -37,14 +38,14 @@ class Behaviour(metaclass=ABCMeta):
 
     async def step(self):
         """
-        Executes a single step of this behaviour. Steps should not block for io (use asyncio instead),
-        neither perform long computation (unload them using Executor).
+        Executes a single step of this behaviour. Steps should not block for IO (use asyncio instead),
+        nor perform long computations (offload them using an executor).
         """
 
     async def _run(self):
         """
-        Internal method, executes single step and then either remove behaviour or schedule next
-        execution depending if behavior is done or not
+        Internal method, executes single step and then either removes behavior or schedules next
+        execution depending on whether behavior is done or not.
         """
         await self.step()
         if self.is_done():
@@ -52,36 +53,63 @@ class Behaviour(metaclass=ABCMeta):
         else:
             self.schedule_execution()
 
+    async def join(self):
+        """
+        Waits for the behavior to complete before continuing.
+        """
+        await self._completion_event.wait()
 
-    #TODO: Add async method 'join' to wait for behaviour completion, use event to signal about completion from '_run'
+    def set_completion_event(self):
+        """
+        Sets up the event signaling when the behavior completes.
+        """
+        self._completion_event = asyncio.Event()
 
     @abstractmethod
     def is_done(self) -> bool:
         """
-        Returns true if behavior is completed and should not accept messages anymore and false otherwise
+        Returns True if behavior is completed and should not accept messages anymore,
+        False otherwise.
         """
+
 
 class ContextBehaviour(Behaviour, metaclass=ABCMeta):
     """
-    This implementation provides access to agent context for the behaviour
+    This implementation provides access to agent context for the behavior.
     """
     _context: AgentContext
 
-    #TODO: Add read/write property for context
+    @property
+    def context(self) -> AgentContext:
+        """
+        Property providing read/write access to the agent context.
+        """
+        return self._context
+
+    @context.setter
+    def context(self, value: AgentContext):
+        self._context = value
+
 
 class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMeta):
     """
-    Behaviour used to wait for messages. Does not schedule execution, waits until
-    proper message is dispatched
+    Behavior used to wait for messages. It does not schedule execution but waits until
+    a suitable message is dispatched.
     """
     @property
     @abstractmethod
     def template(self) -> MessageTemplate:
-        """Template used to get messages for this behavior"""
+        """Template used to receive messages for this behavior."""
 
     def schedule_execution(self):
         """
-        Do nothing, this behavior waits for messages, not for schedule
+        No-op since this behavior awaits incoming messages rather than being scheduled.
         """
 
-    #TODO: Override 'handle_message', store context and message to properties, then call _run
+    async def handle_message(self, context: AgentContext, message):
+        """
+        Handles received messages by storing them into internal state and calling `_run`.
+        """
+        self.context = context
+        self.message = message
+        await self._run()
