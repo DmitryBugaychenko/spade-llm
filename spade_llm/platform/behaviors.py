@@ -5,6 +5,7 @@ from typing import Optional, Callable
 
 from spade_llm.platform.api import MessageHandler, AgentContext, Message
 
+
 class BehaviorsOwner(metaclass=ABCMeta):
     """
     Abstraction for an entity holding behaviours. Used to avoid circular references.
@@ -24,6 +25,7 @@ class BehaviorsOwner(metaclass=ABCMeta):
     @abstractmethod
     def add_behaviour(self, beh: "Behaviour"):
         pass
+
 
 class Behaviour(metaclass=ABCMeta):
     """
@@ -89,6 +91,27 @@ class Behaviour(metaclass=ABCMeta):
         Returns True if behavior is completed and should not accept messages anymore,
         False otherwise.
         """
+    
+    async def receive(self, template: MessageTemplate, timeout: float) -> Optional[Message]:
+        """
+        Creates a ReceiverBehavior and waits for a message matching the template within the timeout.
+        
+        Parameters:
+            template (MessageTemplate): The template to match against incoming messages.
+            timeout (float): Time limit in seconds to wait for a matching message.
+            
+        Returns:
+            Optional[Message]: The received message if one arrives within the timeout, otherwise None.
+        """
+        receiver = ReceiverBehavior(template)
+        self.agent.add_behaviour(receiver)
+        
+        try:
+            await asyncio.wait_for(receiver.join(), timeout)
+            return receiver.message
+        except asyncio.TimeoutError:
+            self.agent.remove_behaviour(receiver)
+            return None
 
 
 class ContextBehaviour(Behaviour, metaclass=ABCMeta):
@@ -107,6 +130,7 @@ class ContextBehaviour(Behaviour, metaclass=ABCMeta):
     @context.setter
     def context(self, value: AgentContext):
         self._context = value
+
 
 class MessageTemplate:
     """
@@ -160,6 +184,7 @@ class MessageTemplate:
             return False
         return True
 
+
 class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMeta):
     """
     Behavior used to wait for messages. It does not schedule execution but waits until
@@ -199,6 +224,7 @@ class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMet
         self._context = context
         self._message = message
         await self._run()
+
 
 class ReceiverBehavior(MessageHandlingBehavior):
     """
