@@ -1,30 +1,48 @@
+import uuid
 from abc import ABCMeta, abstractmethod
 import asyncio
+from typing import Optional, Callable
 
-from spade_llm.platform.agent import Agent, MessageTemplate
-from spade_llm.platform.api import MessageHandler, AgentContext
+from spade_llm.platform.api import MessageHandler, AgentContext, Message
 
+class BehaviorsOwner(metaclass=ABCMeta):
+    """
+    Abstraction for an entity holding behaviours. Used to avoid circular references.
+    """
+    @property
+    @abstractmethod
+    def loop(self) -> asyncio.AbstractEventLoop:
+        """
+        Event loop used for steps execution.
+        """
+        pass
+
+    @abstractmethod
+    def remove_behaviour(self, beh: "Behaviour"):
+        pass
 
 class Behaviour(metaclass=ABCMeta):
     """
     Reusable code block for the agent, consumes a message matching certain template and
     handles it
     """
-    _agent: Agent
+    _agent: BehaviorsOwner
+    _completion_event = asyncio.Event()
+
     @property
-    def agent(self) -> Agent:
+    def agent(self) -> BehaviorsOwner:
         """
         Readonly property returning the associated agent.
         """
         return self._agent
 
-    def setup(self, agent: Agent):
+    async def setup(self, agent: BehaviorsOwner):
         """
         Setup method to initialize the behavior with its associated agent.
         """
         self._agent = agent
 
-    def start(self):
+    async def start(self):
         """
         Start behavior by scheduling its execution
         """
@@ -34,7 +52,8 @@ class Behaviour(metaclass=ABCMeta):
         """
         Schedules execution using agents event loop
         """
-        self.agent.loop.call_soon(self._run)
+        callback = lambda: asyncio.ensure_future(self._run())
+        self.agent.loop.call_soon(callback)
 
     async def step(self):
         """
@@ -49,6 +68,7 @@ class Behaviour(metaclass=ABCMeta):
         """
         await self.step()
         if self.is_done():
+            self._completion_event.set()
             self.agent.remove_behaviour(self)
         else:
             self.schedule_execution()
@@ -58,12 +78,6 @@ class Behaviour(metaclass=ABCMeta):
         Waits for the behavior to complete before continuing.
         """
         await self._completion_event.wait()
-
-    def set_completion_event(self):
-        """
-        Sets up the event signaling when the behavior completes.
-        """
-        self._completion_event = asyncio.Event()
 
     @abstractmethod
     def is_done(self) -> bool:
@@ -90,12 +104,72 @@ class ContextBehaviour(Behaviour, metaclass=ABCMeta):
     def context(self, value: AgentContext):
         self._context = value
 
+class MessageTemplate:
+    """
+    Templates are used to filter messages and dispatch them to proper behavior
+    """
+    def __init__(self,
+                 thread_id: Optional[uuid.UUID] = None,
+                 performative: Optional[str] = None,
+                 validator: Optional[Callable[[Message], bool]] = None):
+        """
+        Initializes the MessageTemplate with optional thread_id, performative, and validator.
+
+        Args:
+            thread_id (Optional[uuid.UUID], optional): The thread identifier. Defaults to None.
+            performative (Optional[str], optional): The performative string. Defaults to None.
+            validator (Optional[Callable[[Message], bool]], optional): Lambda function validating the message. Defaults to None.
+        """
+        self._thread_id = thread_id
+        self._performative = performative
+        self._validator = validator
+
+    @property
+    def thread_id(self) -> Optional[uuid.UUID]:
+        """
+        Gets the thread id if provided.
+        """
+        return self._thread_id
+
+    @property
+    def performative(self) -> Optional[str]:
+        """
+        Gets the performative if provided.
+        """
+        return self._performative
+
+    def match(self, msg: Message) -> bool:
+        """
+        Checks whether the given message matches this template.
+
+        Args:
+            msg (Message): The message to check.
+
+        Returns:
+            bool: True if the message matches the template, False otherwise.
+        """
+        if self._thread_id is not None and msg.thread_id != self._thread_id:
+            return False
+        if self._performative is not None and msg.performative != self._performative:
+            return False
+        if self._validator is not None and not self._validator(msg):
+            return False
+        return True
 
 class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMeta):
     """
     Behavior used to wait for messages. It does not schedule execution but waits until
     a suitable message is dispatched.
     """
+    _message: Optional[Message]
+
+    @property
+    def message(self) -> Optional[Message]:
+        """
+        Received message to handle or None if nothing received
+        """
+        return self._message
+
     @property
     @abstractmethod
     def template(self) -> MessageTemplate:
@@ -106,10 +180,10 @@ class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMet
         No-op since this behavior awaits incoming messages rather than being scheduled.
         """
 
-    async def handle_message(self, context: AgentContext, message):
+    async def handle_message(self, context: AgentContext, message: Message):
         """
         Handles received messages by storing them into internal state and calling `_run`.
         """
-        self.context = context
-        self.message = message
+        self._context = context
+        self._message = message
         await self._run()
