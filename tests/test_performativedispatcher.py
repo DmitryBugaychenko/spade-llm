@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock
-from spade_llm.platform.agent import PerformativeDispatcher, Behaviour, MessageTemplate, Message
+from spade_llm.platform.agent import PerformativeDispatcher, Behaviour, MessageTemplate, Message, \
+    MessageHandlingBehavior
 from spade_llm.platform.api import AgentId
 
-class MockBehavior(Behaviour):
+class MockBehavior(MessageHandlingBehavior):
     def __init__(self, template: MessageTemplate):
         self._template = template
         self._done = False
