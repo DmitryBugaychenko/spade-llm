@@ -118,20 +118,21 @@ class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def find_matching_behaviour(self, msg: Message) -> Optional[MessageHandlingBehavior]:
-        """Lookups for behavior matching given message, first selects proper list based on performative,
-        then finds the first one with matching template."""
+    def find_matching_behaviour(self, msg: Message):
+        """Lookups for behavior(s) matching given message, yields all matching ones."""
 
     async def handle_message(self, context, message):
         """
-        Tries to find behavior matching message and passes message to it. Afterward checks if behavior is
-        done and if so removes it.
+        Tries to find behavior(s) matching message and passes message to each of them. Afterward checks if behavior(s) are
+        done and if so removes them.
         """
-        matched_behavior = self.find_matching_behaviour(message)
-        if matched_behavior:
+        done_behaviors = set()  # Collect behaviors marked as done
+        async for matched_behavior in self.find_matching_behaviour(message):
             await matched_behavior.handle_message(context, message)
             if matched_behavior.is_done():
-                self.remove_behaviour(matched_behavior)
+                done_behaviors.add(matched_behavior)
+        for behavior in done_behaviors:
+            self.remove_behaviour(behavior)
 
     @property
     @abstractmethod
@@ -169,21 +170,18 @@ class PerformativeDispatcher(MessageDispatcher):
             if not self._behaviors_by_performative[performative]:
                 del self._behaviors_by_performative[performative]
 
-    def find_matching_behaviour(self, msg: Message) -> Optional[MessageHandlingBehavior]:
-        """Lookups for behavior matching given message, first selects proper list based on performative,
-        then finds the first one with matching template."""
+    async def find_matching_behaviour(self, msg: Message):
+        """Yields all behaviors matching the given message."""
         performative = msg.performative
         if performative in self._behaviors_by_performative:
             for beh in self._behaviors_by_performative[performative]:
                 if beh.template.match(msg):
-                    return beh
+                    yield beh
         # Check behaviours without performative specified if not found
         if None in self._behaviors_by_performative:
             for beh in self._behaviors_by_performative[None]:
                 if beh.template.match(msg):
-                    return beh
-        return None
-
+                    yield beh
 
     @property
     def is_empty(self) -> bool:
@@ -219,16 +217,17 @@ class ThreadDispatcher(MessageDispatcher):
             if self._dispatchers_by_thread[thread_id].is_empty:
                 del self._dispatchers_by_thread[thread_id]
 
-    def find_matching_behaviour(self, msg: Message) -> Optional[MessageHandlingBehavior]:
+    async def find_matching_behaviour(self, msg: Message):
         """
-        Find matching behavior for the given message.
+        Yields all matching behaviors for the given message.
         """
         thread_id = msg.thread_id
         if thread_id in self._dispatchers_by_thread:
-            return self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg)
+            async for beh in self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg):
+                yield beh
         if None in self._dispatchers_by_thread:
-            return self._dispatchers_by_thread[None].find_matching_behaviour(msg)
-        return None
+            async for beh in self._dispatchers_by_thread[None].find_matching_behaviour(msg):
+                yield beh
 
     @property
     def is_empty(self) -> bool:
