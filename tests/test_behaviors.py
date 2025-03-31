@@ -1,6 +1,14 @@
 import asyncio
 import unittest
-from spade_llm.platform.behaviors import Behaviour
+from unittest.mock import MagicMock
+from spade_llm.platform.behaviors import Behaviour, BehaviorsOwner
+
+class MockAgent(BehaviorsOwner):
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+    
+    def remove_behaviour(self, beh: Behaviour):
+        pass
 
 class CounterBehavior(Behaviour):
     def __init__(self):
@@ -15,8 +23,14 @@ class CounterBehavior(Behaviour):
 
 class TestBehaviours(unittest.TestCase):
     def test_counter_behavior(self):
+        # Create instance of MockAgent
+        agent = MockAgent()
+        
         # Create instance of CounterBehavior
         behavior = CounterBehavior()
+        
+        # Set up behavior with agent
+        behavior.setup(agent)
         
         # Schedule execution manually
         behavior.start()
