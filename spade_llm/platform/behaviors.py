@@ -195,3 +195,10 @@ class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMet
         self._context = context
         self._message = message
         await self._run()
+
+class ReceiverBehavior(MessageHandlingBehavior):
+    """
+    Inherits from MessageHandlingBehavior and returns 'True' for is_done() once a message is received.
+    """
+    def is_done(self) -> bool:
+        return self.message is not None
