@@ -18,7 +18,7 @@ class MockAgent(BehaviorsOwner):
         pass
 
     def add_behaviour(self, beh: Behaviour):
-        pass
+        self.received_behaviour = beh
 
 class CounterBehavior(Behaviour):
     def __init__(self):
