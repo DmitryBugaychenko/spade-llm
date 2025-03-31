@@ -165,6 +165,9 @@ class MessageHandlingBehavior(ContextBehaviour, MessageHandler, metaclass=ABCMet
     _message: Optional[Message]
 
     def __init__(self, template: MessageTemplate):
+        """
+        :param template: Template for the message to wait for
+        """
         super().__init__()
         self._template = template
 
