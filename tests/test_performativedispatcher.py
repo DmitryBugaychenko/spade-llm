@@ -46,7 +46,7 @@ class TestPerformativeDispatcher(unittest.TestCase):
         self.dispatcher.remove_behaviour(mock_behaviour)
         self.assertTrue(self.dispatcher.is_empty)
 
-    def test_find_matching_behaviour(self):
+    def test_find_matching_behaviour_single_match(self):
         template = MessageTemplate(performative='test')
         mock_behaviour = MockBehavior(template)
         self.dispatcher.add_behaviour(mock_behaviour)
@@ -62,9 +62,9 @@ class TestPerformativeDispatcher(unittest.TestCase):
             content=''
         )
         
-        found_behaviour = self.dispatcher.find_matching_behaviour(message)
-        self.assertIsNotNone(found_behaviour)
-        self.assertEqual(found_behaviour, mock_behaviour)
+        found_behaviours = [b async for b in self.dispatcher.find_matching_behaviour(message)]
+        self.assertEqual(len(found_behaviours), 1)
+        self.assertIn(mock_behaviour, found_behaviours)
 
     async def test_handle_message(self):
         template = MessageTemplate(performative='test')
@@ -75,6 +75,26 @@ class TestPerformativeDispatcher(unittest.TestCase):
         message = Message(performative='test', content='')
         await self.dispatcher.handle_message(context_mock, message)
         mock_behaviour.handle_message.assert_called_once_with(context_mock, message)
+
+    def test_multiple_matching_behaviors(self):
+        # Create two behaviors with different templates but both matching 'test' performative
+        template_1 = MessageTemplate(performative='test')
+        template_2 = MessageTemplate(performative='test')
+        mock_behaviour_1 = MockBehavior(template_1)
+        mock_behaviour_2 = MockBehavior(template_2)
+        self.dispatcher.add_behaviour(mock_behaviour_1)
+        self.dispatcher.add_behaviour(mock_behaviour_2)
+
+        # Prepare a message matching both behaviors
+        sender = AgentId(agent_type="TestSender", agent_id="1")
+        receiver = AgentId(agent_type="TestReceiver", agent_id="2")
+        message = Message(sender=sender, receiver=receiver, performative='test', content='')
+
+        # Find matching behaviors
+        found_behaviours = [b async for b in self.dispatcher.find_matching_behaviour(message)]
+        self.assertEqual(len(found_behaviours), 2)
+        self.assertIn(mock_behaviour_1, found_behaviours)
+        self.assertIn(mock_behaviour_2, found_behaviours)
 
 if __name__ == "__main__":
     unittest.main()
