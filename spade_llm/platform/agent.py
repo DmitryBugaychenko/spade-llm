@@ -149,6 +149,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     _is_stopped: asyncio.Event  # Event flag indicating completion
     _thread: Optional[threading.Thread] = None  # Store reference to the thread
     _agent_type: str  # New private variable for agent_type
+    _default_context: Optional[AgentContext] = None  # Property to hold default context
     logger: logging.Logger
 
     def __init__(self, agent_type: str):  # Updated constructor signature
@@ -180,6 +181,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         Creates a new event loop, starts a new thread, runs the event loop in the thread,
         and calls run_until_complete for the loop.
         """
+        self._default_context = default_context  # Store the default context here
         self.setup()
 
         self._thread = threading.Thread(
@@ -187,7 +189,6 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             name=f"{self.agent_type}-Thread",  # Set thread name based on agent_type
         )
         self._thread.start()
-
 
     def _run_agent_in_thread(self):
         """
@@ -211,7 +212,6 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             self.loop.run_until_complete(asyncio.gather(*all_tasks, return_exceptions=True))
             self.loop.close()
             self.logger.info("Exited agent thread.")
-
 
     def add_behaviour(self, beh: Behaviour):
         """
