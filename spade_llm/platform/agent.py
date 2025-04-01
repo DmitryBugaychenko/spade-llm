@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 import logging
 
-from spade_llm.platform.api import Message, AgentHandler
+from spade_llm.platform.api import Message, AgentHandler, AgentContext
 from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
 
 class MessageDispatcher(metaclass=ABCMeta):
@@ -147,7 +147,6 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     _dispatcher: ThreadDispatcher
     _behaviors: list[Behaviour]  # Internal list for storing non-MHB Behaviors
     _is_stopped: asyncio.Event  # Event flag indicating completion
-    _is_completed: asyncio.Event  # Event flag indicating completion
     _thread: Optional[threading.Thread] = None  # Store reference to the thread
     _agent_type: str  # New private variable for agent_type
     logger: logging.Logger
@@ -176,37 +175,33 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         Setup method to initialize agent and construct all default behaviors.
         """
 
-    def start(self) -> None:
+    def start(self, default_context: AgentContext) -> None:
         """
         Creates a new event loop, starts a new thread, runs the event loop in the thread,
         and calls run_until_complete for the loop.
         """
         self.setup()
 
-        self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
             target=self._run_agent_in_thread,
             name=f"{self.agent_type}-Thread",  # Set thread name based on agent_type
         )
         self._thread.start()
 
-        self.loop.call_soon_threadsafe(self._start_behaviors)
-
-    def _start_behaviors(self):
-        """
-        Starts all behaviors.
-        """
-        for beh in self._behaviors:
-            beh.start()
 
     def _run_agent_in_thread(self):
         """
         Runs the event loop in a separate thread.
         """
+        self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
+
+        for beh in self._behaviors:
+            beh.start()
+
         try:
             self.logger.info("Started agent thread")
-            self.loop.run_until_complete(self._wait_for_stop())
+            self.loop.run_until_complete(self._is_stopped.wait())
         finally:
             # Cleanly shutdown the event loop
             self.logger.info("Shutting down agent thread...")
@@ -216,13 +211,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             self.loop.run_until_complete(asyncio.gather(*all_tasks, return_exceptions=True))
             self.loop.close()
             self.logger.info("Exited agent thread.")
-            self._is_completed.set()
 
-    async def _wait_for_stop(self):
-        """
-        Wait for the stop signal and then cleanly shut down.
-        """
-        await self._is_stopped.wait()
 
     def add_behaviour(self, beh: Behaviour):
         """
@@ -271,7 +260,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Stops the agent by setting the stop event.
         """
-        self._is_stopped.set()
+        self.loop.call_soon_threadsafe(self._is_stopped.set)
         self.logger.info("%s stopped.", self.__class__.__name__)
 
     async def join(self):
@@ -279,7 +268,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         Waits for the agent to complete its operations.
         """
         if self._thread:
-            await self._is_completed.wait()
+            await asyncio.create_task(self._thread.join())
 
     def is_running(self) -> bool:
         """
