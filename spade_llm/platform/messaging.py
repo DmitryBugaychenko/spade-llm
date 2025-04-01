@@ -16,7 +16,7 @@ class DictionaryMessageService(MessageService):
     async def post_message(self, msg: Message):
         agent_type = msg.receiver.agent_type
         if agent_type not in self.sources:
-            raise Exception(f"No message source found for agent type '{agent_type}'")  # Threw exception when source not found
+            raise Exception(f"No message source found for agent type '{agent_type}'")
         source = self.sources[agent_type]
         await source.post_message(msg)
 
@@ -24,10 +24,11 @@ class DictionaryMessageService(MessageService):
 class MessageSourceImpl(MessageSource):
     """Concrete implementation of MessageSource using asyncio.Queue."""
 
-    def __init__(self, agent_type: str, queue_size: int = 50):  # Added optional constructor param
+    def __init__(self, agent_type: str, queue_size: int = 50):
         self._agent_type = agent_type
         self.queue = asyncio.Queue(maxsize=queue_size)
         self.shutdown_event = asyncio.Event()
+        self._loop = asyncio.get_event_loop()  # Memorize current event loop
 
     @property
     def agent_type(self) -> str:
@@ -51,7 +52,8 @@ class MessageSourceImpl(MessageSource):
 
     async def post_message(self, message: Message):
         if not self.shutdown_event.is_set():
-            await self.queue.put(message)
+            # Use call_soon_threadsafe to safely enqueue the message
+            self._loop.call_soon_threadsafe(self.queue.put_nowait, message)
 
     @agent_type.setter
     def agent_type(self, value):
