@@ -203,11 +203,26 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Runs the event loop in a separate thread.
         """
-        self.logger.info("Started agent thread")
         asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self._is_stopped.wait())
-        self.logger.info("Exiting agent thread")
-        self._is_completed.set()
+        try:
+            self.logger.info("Started agent thread")
+            self.loop.run_until_complete(self._wait_for_stop())
+        finally:
+            # Cleanly shutdown the event loop
+            self.logger.info("Shutting down agent thread...")
+            all_tasks = asyncio.all_tasks(loop=self.loop)
+            for task in all_tasks:
+                task.cancel()
+            self.loop.run_until_complete(asyncio.gather(*all_tasks, return_exceptions=True))
+            self.loop.close()
+            self.logger.info("Exited agent thread.")
+            self._is_completed.set()
+
+    async def _wait_for_stop(self):
+        """
+        Wait for the stop signal and then cleanly shut down.
+        """
+        await self._is_stopped.wait()
 
     def add_behaviour(self, beh: Behaviour):
         """
@@ -254,7 +269,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
 
     def stop(self):
         """
-        Stops the agent by stopping the event loop and signaling completion.
+        Stops the agent by setting the stop event.
         """
         self._is_stopped.set()
         self.logger.info("%s stopped.", self.__class__.__name__)
