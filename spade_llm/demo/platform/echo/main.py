@@ -1,17 +1,26 @@
 import asyncio
 from aioconsole import ainput
+
+from spade_llm.platform.agent import Agent
 from spade_llm.platform.api import AgentHandler, Message, AgentId
+from spade_llm.platform.behaviors import MessageHandlingBehavior, MessageTemplate
 from spade_llm.platform.platform import AgentPlatformImpl
 from spade_llm.platform.storage import InMemoryStorageFactory
 from spade_llm.platform.messaging import DictionaryMessageService
 
-class EchoAgentHandler(AgentHandler):
-    @property
-    def agent_type(self) -> str:
-        return "echo"
+class EchoAgentHandler(Agent):
+    def __init__(self):
+        super().__init__("echo")
 
-    async def handle_message(self, context, message: Message):
-        print(f"EchoAgent received message: {message.content}")
+    class EchoBehaviour(MessageHandlingBehavior):
+
+        async def step(self):
+            print(f"EchoAgent received message: {self.message.content}")
+
+    def setup(self):
+        self.add_behaviour(self.EchoBehaviour(MessageTemplate()))
+
+
 
 async def main():
     # Initialize the platform components
