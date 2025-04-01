@@ -139,6 +139,7 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
     _dispatcher: ThreadDispatcher
     _behaviors: list[Behaviour]  # Internal list for storing non-MHB Behaviors
     _is_done: threading.Event  # Event flag indicating completion
+    _thread: Optional[threading.Thread] = None  # Store reference to the thread
 
     def __init__(self):
         self._dispatcher = ThreadDispatcher()
@@ -163,8 +164,8 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         and calls run_until_complete for the loop.
         """
         self._loop = asyncio.new_event_loop()
-        t = threading.Thread(target=self._run_agent_in_thread)
-        t.start()
+        self._thread = threading.Thread(target=self._run_agent_in_thread)
+        self._thread.start()
 
         self.loop.call_soon_threadsafe(self._start_behaviors)
 
@@ -227,3 +228,9 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         Waits for the agent to complete its operations.
         """
         self._is_done.wait()
+
+    def is_running(self) -> bool:
+        """
+        Checks if the agent's thread is alive and running.
+        """
+        return self._thread is not None and self._thread.is_alive()
