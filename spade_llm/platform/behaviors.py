@@ -179,6 +179,15 @@ class ContextBehaviour(Behaviour, metaclass=ABCMeta):
     """
     _context: AgentContext
 
+    def __init__(self, context: Optional[AgentContext] = None):
+        """
+        Initialize ContextBehaviour optionally passing an initial context.
+        :param context: Initial context object (optional).
+        """
+        super().__init__()
+        if context is not None:
+            self.context = context
+
     @property
     def context(self) -> AgentContext:
         """
