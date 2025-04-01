@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import uuid
 from abc import ABCMeta, abstractmethod
 from asyncio import AbstractEventLoop
@@ -156,10 +157,19 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
 
     def start(self) -> None:
         """
-        Starts an agent and all its behaviors
+        Creates a new event loop, starts a new thread, runs the event loop in the thread,
+        and calls run_until_complete for the loop.
         """
-        for bhv in self._behaviors:
-            bhv.start()
+        self._loop = asyncio.new_event_loop()
+        t = threading.Thread(target=self.run_agent_in_thread, args=(self._loop,))
+        t.start()
+
+    def run_agent_in_thread(self, loop: AbstractEventLoop):
+        """
+        Runs the event loop in a separate thread.
+        """
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
 
     def add_behaviour(self, beh: Behaviour):
         """
@@ -171,7 +181,6 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
             self._dispatcher.add_behaviour(beh)
         beh.setup(self)
 
-
     def remove_behaviour(self, beh: Behaviour):
         """
         Removes a behavior from either the dispatcher or the internal list based on its type.
@@ -181,7 +190,6 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
             self._behaviors.remove(beh)
             if isinstance(beh, MessageHandlingBehavior):
                 self._dispatcher.remove_behaviour(beh)
-
 
     async def handle_message(self, context, message):
         """
