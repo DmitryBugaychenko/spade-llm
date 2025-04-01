@@ -20,10 +20,18 @@ class BehaviorsOwner(metaclass=ABCMeta):
 
     @abstractmethod
     def remove_behaviour(self, beh: "Behaviour"):
+        """
+        Removes behavior from the list
+        :param beh: Behaviour to remove
+        """
         pass
 
     @abstractmethod
     def add_behaviour(self, beh: "Behaviour"):
+        """
+        Add behavior to the list and configures to use this container
+        :param beh: Behavior to add
+        """
         pass
 
 class MessageTemplate:
@@ -114,6 +122,7 @@ class Behaviour(metaclass=ABCMeta):
         callback = lambda: asyncio.ensure_future(self._run())
         self.agent.loop.call_soon(callback)
 
+    @abstractmethod
     async def step(self):
         """
         Executes a single step of this behaviour. Steps should not block for IO (use asyncio instead),
@@ -138,12 +147,12 @@ class Behaviour(metaclass=ABCMeta):
         """
         await self._completion_event.wait()
 
-    @abstractmethod
     def is_done(self) -> bool:
         """
         Returns True if behavior is completed and should not accept messages anymore,
         False otherwise.
         """
+        return False
     
     async def receive(self, template: MessageTemplate, timeout: float) -> Optional[Message]:
         """
@@ -227,5 +236,11 @@ class ReceiverBehavior(MessageHandlingBehavior):
     """
     Inherits from MessageHandlingBehavior and returns 'True' for is_done() once a message is received.
     """
+
+    async def step(self):
+        """
+        Do nothing, we just expect the message
+        """
+
     def is_done(self) -> bool:
         return self.message is not None
