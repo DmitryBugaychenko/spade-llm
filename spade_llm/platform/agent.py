@@ -5,8 +5,14 @@ from abc import ABCMeta, abstractmethod
 from asyncio import AbstractEventLoop
 from typing import Dict, List, Optional
 
+import logging
+
 from spade_llm.platform.api import Message, AgentHandler
 from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
+
+# Initialize logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class MessageDispatcher(metaclass=ABCMeta):
     @abstractmethod
@@ -52,6 +58,7 @@ class PerformativeDispatcher(MessageDispatcher):
         if performative not in self._behaviors_by_performative:
             self._behaviors_by_performative[performative] = []
         self._behaviors_by_performative[performative].append(beh)
+        logger.info("Added behavior %s with performative %s", beh, performative)
 
     def remove_behaviour(self, beh: MessageHandlingBehavior):
         """
@@ -63,6 +70,7 @@ class PerformativeDispatcher(MessageDispatcher):
             self._behaviors_by_performative[performative].remove(beh)
             if not self._behaviors_by_performative[performative]:
                 del self._behaviors_by_performative[performative]
+            logger.info("Removed behavior %s with performative %s", beh, performative)
 
     def find_matching_behaviour(self, msg: Message):
         """Yields all behaviors matching the given message."""
@@ -99,6 +107,7 @@ class ThreadDispatcher(MessageDispatcher):
         if thread_id not in self._dispatchers_by_thread:
             self._dispatchers_by_thread[thread_id] = PerformativeDispatcher()
         self._dispatchers_by_thread[thread_id].add_behaviour(beh)
+        logger.info("Added behavior %s with thread ID %s", beh, thread_id)
 
     def remove_behaviour(self, beh: MessageHandlingBehavior):
         """
@@ -110,6 +119,7 @@ class ThreadDispatcher(MessageDispatcher):
             self._dispatchers_by_thread[thread_id].remove_behaviour(beh)
             if self._dispatchers_by_thread[thread_id].is_empty:
                 del self._dispatchers_by_thread[thread_id]
+            logger.info("Removed behavior %s with thread ID %s", beh, thread_id)
 
     def find_matching_behaviour(self, msg: Message):
         """
@@ -132,8 +142,8 @@ class ThreadDispatcher(MessageDispatcher):
 
 class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     """
-    Base class for all agents. Provide asyncio event loop for execution, adds and removes
-    behaviors, handle messages by dispatching them to interested behaviours
+    Base class for all agents. Provides asyncio event loop for execution, adds and removes
+    behaviors, handles messages by dispatching them to interested behaviors.
     """
     _loop: AbstractEventLoop
     _dispatcher: ThreadDispatcher
@@ -163,7 +173,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
 
     def setup(self):
         """
-        Setup method to initialize agent and construct all default behaviors
+        Setup method to initialize agent and construct all default behaviors.
         """
 
     def start(self) -> None:
@@ -184,7 +194,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
 
     def _start_behaviors(self):
         """
-        Starts all behaviors
+        Starts all behaviors.
         """
         for beh in self._behaviors:
             beh.start()
@@ -208,6 +218,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         beh.setup(self)
         if self.is_running():
             beh.start()
+        logger.info("Added behavior %s to agent %s", beh, self)
 
     def remove_behaviour(self, beh: Behaviour):
         """
@@ -218,9 +229,11 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             self._behaviors.remove(beh)
             if isinstance(beh, MessageHandlingBehavior):
                 self._dispatcher.remove_behaviour(beh)
+            logger.info("Removed behavior %s from agent %s", beh, self)
 
     async def handle_message(self, context, message):
-        callback = lambda: asyncio.ensure_future(self._handle_message_in_loop(context,message))
+        logger.debug("Handling message: %s", message)
+        callback = lambda: asyncio.ensure_future(self._handle_message_in_loop(context, message))
         self.loop.call_soon_threadsafe(callback)
 
     async def _handle_message_in_loop(self, context, message):
@@ -228,19 +241,21 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         Tries to find behavior(s) matching message and passes message to each of them. Afterward checks if behavior(s) are
         done and if so removes them.
         """
-        done_behaviors = list()  # Collect behaviors marked as done
+        done_behaviors = []  # Collect behaviors marked as done
         for matched_behavior in self._dispatcher.find_matching_behaviour(message):
             await matched_behavior.handle_message(context, message)
             if matched_behavior.is_done():
                 done_behaviors.append(matched_behavior)
         for behavior in done_behaviors:
             self.remove_behaviour(behavior)
+        logger.debug("Handled message: %s", message)
 
     def stop(self):
         """
         Stops the agent by stopping the event loop and signaling completion.
         """
         self._is_stopped.set()
+        logger.info("%s stopped.", self.__class__.__name__)
 
     async def join(self):
         """
