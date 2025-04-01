@@ -226,6 +226,32 @@ class AgentHandler(MessageHandler, metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def start(self, default_context: AgentContext) -> None:
+        """
+        Starts agent thread and event loop
+        :param default_context: Default context for agent.
+        """
+
+    @abstractmethod
+    def stop(self):
+        """
+        Stops the agent by stopping the event loop and signaling completion.
+        """
+
+    @abstractmethod
+    async def join(self):
+        """
+        Waits for the agent to complete its operations.
+        """
+
+    async def shutdown(self):
+        """
+        Stop agent and wait for its completion
+        """
+        self.stop()
+        await self.join()
+
 
 class AgentPlatform(metaclass=ABCMeta):
     """

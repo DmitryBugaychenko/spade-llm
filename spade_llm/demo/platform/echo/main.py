@@ -3,8 +3,8 @@ from aioconsole import ainput
 import logging
 
 from spade_llm.platform.agent import Agent
-from spade_llm.platform.api import AgentHandler, Message, AgentId
-from spade_llm.platform.behaviors import MessageHandlingBehavior, MessageTemplate
+from spade_llm.platform.api import Message, AgentId
+from spade_llm.platform.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.platform.platform import AgentPlatformImpl
 from spade_llm.platform.storage import InMemoryStorageFactory
 from spade_llm.platform.messaging import DictionaryMessageService
@@ -18,12 +18,28 @@ class EchoAgentHandler(Agent):
         super().__init__("echo")
 
     class EchoBehaviour(MessageHandlingBehavior):
-
         async def step(self):
-            print(f"EchoAgent received message: {self.message.content}")
+            print(f"\nEchoAgent received message: {self.message.content}")
+
+    class InputBehavior(ContextBehaviour):
+        async def step(self):
+            user_input = await ainput("Enter a message to send to the agent (type 'exit' to quit): ")
+            if user_input.lower() == 'exit':
+                self.agent.stop()
+            else:
+                # Construct a message and send it to the agent
+                message = Message(
+                    sender=AgentId(agent_type="console", agent_id="user"),
+                    receiver=AgentId(agent_type="echo", agent_id="echo_agent"),
+                    performative="inform",
+                    content=user_input)
+
+                await self.context.send(message)
+
 
     def setup(self):
         self.add_behaviour(self.EchoBehaviour(MessageTemplate()))
+        self.add_behaviour(self.InputBehavior(self.default_context))
 
 
 
@@ -37,21 +53,22 @@ async def main():
     echo_handler = EchoAgentHandler()
     await platform.register_agent(echo_handler, [])
 
-    # Main loop to read user input and send messages
-    while True:
-        user_input = await ainput("Enter a message to send to the agent (type 'exit' to quit): ")
-        if user_input.lower() == 'exit':
-            break
+    # # Main loop to read user input and send messages
+    # while True:
+    #     user_input = await ainput("Enter a message to send to the agent (type 'exit' to quit): ")
+    #     if user_input.lower() == 'exit':
+    #         break
+    #
+    #     # Construct a message and send it to the agent
+    #     message = Message(
+    #         sender=AgentId(agent_type="console", agent_id="user"),
+    #         receiver=AgentId(agent_type="echo", agent_id="echo_agent"),
+    #         performative="inform",
+    #         content=user_input
+    #     )
+    #     await message_service.post_message(message)
 
-        # Construct a message and send it to the agent
-        message = Message(
-            sender=AgentId(agent_type="console", agent_id="user"),
-            receiver=AgentId(agent_type="echo", agent_id="echo_agent"),
-            performative="inform",
-            content=user_input
-        )
-        await message_service.post_message(message)
-
+    await echo_handler.join()
     # Shut down the platform gracefully
     await platform.shutdown()
 

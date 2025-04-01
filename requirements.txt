@@ -17,3 +17,6 @@ numpy~=1.26.4
 pandas~=2.0.3
 slixmpp~=1.8.5
 requests~=2.32.3
+certifi~=2025.1.31
+openai~=1.69.0
+aiologic~=0.14.0

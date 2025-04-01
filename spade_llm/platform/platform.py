@@ -1,5 +1,6 @@
 import asyncio
-from typing import Dict, List
+from typing import Dict, List, Optional
+from uuid import UUID
 
 from langchain_core.tools import BaseTool
 
@@ -25,12 +26,12 @@ class AgentPlatformImpl(AgentPlatform):
         self.run_loop_tasks: Dict[str, asyncio.Task] = {}
         self.message_sources: Dict[str, MessageSource] = {}  # New dictionary to hold message sources
 
-    async def register_agent(self, handler: AgentHandler, tools: List[BaseTool]):
-        agent_type = handler.agent_type
+    async def register_agent(self, agent: AgentHandler, tools: List[BaseTool]):
+        agent_type = agent.agent_type
         if agent_type in self.agents:
             raise ValueError(f"An agent with type '{agent_type}' is already registered.")
 
-        self.agents[agent_type] = handler
+        self.agents[agent_type] = agent
         self.storages[agent_type] = await self.storage_factory.create_storage(agent_type)
         self.tools_by_agent[agent_type] = tools
 
@@ -38,8 +39,11 @@ class AgentPlatformImpl(AgentPlatform):
         message_source = await self.message_service.get_or_create_source(agent_type)
         self.message_sources[agent_type] = message_source
 
+        # Start the agent
+        agent.start(self.create_context(agent, "default", None))
+
         # Start consuming messages
-        task = asyncio.create_task(self.consume_messages(handler, message_source))
+        task = asyncio.create_task(self.consume_messages(agent, message_source))
         self.run_loop_tasks[agent_type] = task
 
     async def consume_messages(self, handler: AgentHandler, message_source: MessageSource):
@@ -48,13 +52,15 @@ class AgentPlatformImpl(AgentPlatform):
             if message is None:
                 break
 
-            agent_id = message.receiver.agent_id
-            kv_store = PrefixKeyValueStorage(self.storages[handler.agent_type], agent_id)
-            tools = self.tools_by_agent.get(handler.agent_type, [])
-
-            context = AgentContextImpl(kv_store, agent_id, message.thread_id, self.message_service, tools=tools)
+            context = self.create_context(handler, message.receiver.agent_id, message.thread_id)
             await handler.handle_message(context, message)
             await message_source.message_handled()
+
+    def create_context(self, handler: AgentHandler, agent_id: str, thread_id: Optional[UUID]  ):
+        kv_store = PrefixKeyValueStorage(self.storages[handler.agent_type], agent_id)
+        tools = self.tools_by_agent.get(handler.agent_type, [])
+        context = AgentContextImpl(kv_store, agent_id, thread_id, self.message_service, tools=tools)
+        return context
 
     async def shutdown(self):
         # Shutdown all message sources
@@ -71,6 +77,9 @@ class AgentPlatformImpl(AgentPlatform):
 
         # Await cancellation of tasks
         await asyncio.gather(*self.run_loop_tasks.values(), return_exceptions=True)
+
+        stop_tasks = [x.shutdown() for x in self.agents.values()]
+        await asyncio.gather(*stop_tasks, return_exceptions=True)
 
         # Close storages
         for storage in self.storages.values():

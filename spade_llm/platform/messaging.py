@@ -53,7 +53,8 @@ class MessageSourceImpl(MessageSource):
     async def post_message(self, message: Message):
         if not self.shutdown_event.is_set():
             # Use call_soon_threadsafe to safely enqueue the message
-            self._loop.call_soon_threadsafe(self.queue.put_nowait, message)
+            callback = lambda: asyncio.ensure_future(self.queue.put(message))
+            self._loop.call_soon_threadsafe(callback)
 
     @agent_type.setter
     def agent_type(self, value):

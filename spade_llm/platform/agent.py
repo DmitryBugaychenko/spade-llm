@@ -3,9 +3,11 @@ import threading
 import uuid
 from abc import ABCMeta, abstractmethod
 from asyncio import AbstractEventLoop
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import logging
+
+import aiologic
 
 from spade_llm.platform.api import Message, AgentHandler, AgentContext
 from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
@@ -158,7 +160,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         self._dispatcher = ThreadDispatcher(logger=self.logger)
         self._behaviors = []
         self._is_stopped = asyncio.Event()
-        self._is_completed = asyncio.Event()
+        self._is_completed = aiologic.Event() # This is a thread-safe event
 
     @property
     def agent_type(self) -> str:
@@ -222,6 +224,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
                 task.cancel()
             self.loop.run_until_complete(asyncio.gather(*all_tasks, return_exceptions=True))
             self.loop.close()
+            self._is_completed.set()
             self.logger.info("Exited agent thread.")
 
     def add_behaviour(self, beh: Behaviour):
@@ -279,7 +282,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         Waits for the agent to complete its operations.
         """
         if self._thread:
-            await asyncio.create_task(self._thread.join())
+            await self._is_completed
 
     def is_running(self) -> bool:
         """
