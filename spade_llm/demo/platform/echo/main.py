@@ -1,5 +1,6 @@
 import asyncio
 from aioconsole import ainput
+import logging
 
 from spade_llm.platform.agent import Agent
 from spade_llm.platform.api import AgentHandler, Message, AgentId
@@ -7,6 +8,10 @@ from spade_llm.platform.behaviors import MessageHandlingBehavior, MessageTemplat
 from spade_llm.platform.platform import AgentPlatformImpl
 from spade_llm.platform.storage import InMemoryStorageFactory
 from spade_llm.platform.messaging import DictionaryMessageService
+
+# Enable logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class EchoAgentHandler(Agent):
     def __init__(self):
