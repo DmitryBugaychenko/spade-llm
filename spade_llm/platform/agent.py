@@ -14,9 +14,11 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
     behaviors, handle messages by dispatching them to interested behaviours
     """
     _loop: AbstractEventLoop
+    _behaviors: List[Behaviour]  # New field to hold behaviors
 
     def __init__(self):
         self._loop = None
+        self._behaviors = []  # Initialize the list here
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -34,6 +36,24 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Starts an agent and all its behaviors
         """
+        for behavior in self._behaviors:
+            behavior.start()
+
+    def add_behaviour(self, beh: Behaviour):
+        """
+        Adds a behavior to the agent's list of behaviors.
+        :param beh: The behavior to add.
+        """
+        self._behaviors.append(beh)
+
+    def remove_behaviour(self, beh: Behaviour):
+        """
+        Removes a behavior from the agent's list of behaviors.
+        :param beh: The behavior to remove.
+        """
+        if beh in self._behaviors:
+            self._behaviors.remove(beh)
+
 
 class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
     @abstractmethod
