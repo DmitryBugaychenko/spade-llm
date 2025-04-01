@@ -1,25 +1,39 @@
 import asyncio
 import uuid
 from abc import ABCMeta, abstractmethod
+from asyncio import AbstractEventLoop
 from typing import Dict, List, Optional
 
 from spade_llm.platform.api import MessageHandler, Message
-from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior
+from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
 
 
-class Agent(MessageHandler, metaclass=ABCMeta):
+class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
     """
     Base class for all agents. Provide asyncio event loop for execution, adds and removes
     behaviors, handle messages by dispatching them to interested behaviours
     """
-    @property
-    @abstractmethod
-    def loop(self) -> asyncio.AbstractEventLoop:
-        pass
+    _loop: AbstractEventLoop
 
-    @abstractmethod
-    def remove_behaviour(self, beh: Behaviour):
-        pass
+    def __init__(self):
+        self._loop = None
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        """
+        Event loop used to execute agent logic and handle incoming messages.
+        """
+        return self._loop
+
+    def setup(self):
+        """
+        Setup method to initialize agent and construct all default behaviors
+        """
+
+    def start(self) -> None:
+        """
+        Starts an agent and all its behaviors
+        """
 
 class MessageDispatcher(MessageHandler, metaclass=ABCMeta):
     @abstractmethod
