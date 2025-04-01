@@ -3,7 +3,7 @@ import threading
 import uuid
 from abc import ABCMeta, abstractmethod
 from asyncio import AbstractEventLoop
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import logging
 
@@ -148,11 +148,11 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     _behaviors: list[Behaviour]  # Internal list for storing non-MHB Behaviors
     _is_stopped: asyncio.Event  # Event flag indicating completion
     _thread: Optional[threading.Thread] = None  # Store reference to the thread
-    _agent_type: str  # New private variable for agent_type
-    _default_context: Optional[AgentContext] = None  # Property to hold default context
+    _agent_type: str  # Private variable for agent_type
+    _default_context: AgentContext  # Property to hold default context (not optional anymore)
     logger: logging.Logger
 
-    def __init__(self, agent_type: str):  # Updated constructor signature
+    def __init__(self, agent_type: str):  # Constructor signature remains unchanged
         self._agent_type = agent_type  # Assign agent_type during initialization
         self.logger = logging.getLogger(self._agent_type)
         self._dispatcher = ThreadDispatcher(logger=self.logger)
@@ -172,10 +172,14 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         return self._loop
 
     @property
-    def default_context(self) -> Optional[AgentContext]:
+    def default_context(self) -> AgentContext:
         """
         Getter for the default context.
+        Raises:
+            ValueError: If the default context has not been set yet.
         """
+        if self._default_context is None:
+            raise ValueError("Default context must be initialized before accessing!")
         return self._default_context
 
     def setup(self):
