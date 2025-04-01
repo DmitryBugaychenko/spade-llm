@@ -161,15 +161,24 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         and calls run_until_complete for the loop.
         """
         self._loop = asyncio.new_event_loop()
-        t = threading.Thread(target=self.run_agent_in_thread, args=(self._loop,))
+        t = threading.Thread(target=self._run_agent_in_thread)
         t.start()
 
-    def run_agent_in_thread(self, loop: AbstractEventLoop):
+        self.loop.call_soon_threadsafe(self._start_behaviors)
+
+    def _start_behaviors(self):
+        """
+        Starts all behaviors
+        """
+        for beh in self._behaviors:
+            beh.start()
+
+    def _run_agent_in_thread(self):
         """
         Runs the event loop in a separate thread.
         """
-        asyncio.set_event_loop(loop)
-        loop.run_forever()
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
 
     def add_behaviour(self, beh: Behaviour):
         """
