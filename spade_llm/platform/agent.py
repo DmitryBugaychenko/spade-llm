@@ -10,10 +10,6 @@ import logging
 from spade_llm.platform.api import Message, AgentHandler
 from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
 
-# Initialize logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
 class MessageDispatcher(metaclass=ABCMeta):
     @abstractmethod
     def add_behaviour(self, beh):
@@ -46,8 +42,9 @@ class PerformativeDispatcher(MessageDispatcher):
     as a key and list of behaviors as values plus extra list for behaviors without performative specified.
     """
 
-    def __init__(self):
+    def __init__(self, logger):
         self._behaviors_by_performative: Dict[Optional[str], List[MessageHandlingBehavior]] = {}
+        self.logger = logger
 
     def add_behaviour(self, beh: MessageHandlingBehavior):
         """
@@ -58,7 +55,7 @@ class PerformativeDispatcher(MessageDispatcher):
         if performative not in self._behaviors_by_performative:
             self._behaviors_by_performative[performative] = []
         self._behaviors_by_performative[performative].append(beh)
-        logger.info("Added behavior %s with performative %s", beh, performative)
+        self.logger.debug("Added behavior %s with performative %s", beh, performative)
 
     def remove_behaviour(self, beh: MessageHandlingBehavior):
         """
@@ -70,7 +67,7 @@ class PerformativeDispatcher(MessageDispatcher):
             self._behaviors_by_performative[performative].remove(beh)
             if not self._behaviors_by_performative[performative]:
                 del self._behaviors_by_performative[performative]
-            logger.info("Removed behavior %s with performative %s", beh, performative)
+            self.logger.debug("Removed behavior %s with performative %s", beh, performative)
 
     def find_matching_behaviour(self, msg: Message):
         """Yields all behaviors matching the given message."""
@@ -95,8 +92,9 @@ class ThreadDispatcher(MessageDispatcher):
     Stores PerformativeDispatcher grouped by thread id with a separate list for behaviors without thread specified.
     When behaviour is removed checks if nested dispatcher is empty and removes it if so.
     """
-    def __init__(self):
+    def __init__(self, logger):
         self._dispatchers_by_thread: Dict[Optional[uuid.UUID], PerformativeDispatcher] = {}
+        self.logger = logger
 
     def add_behaviour(self, beh: MessageHandlingBehavior):
         """
@@ -105,9 +103,9 @@ class ThreadDispatcher(MessageDispatcher):
         """
         thread_id = beh.template.thread_id
         if thread_id not in self._dispatchers_by_thread:
-            self._dispatchers_by_thread[thread_id] = PerformativeDispatcher()
+            self._dispatchers_by_thread[thread_id] = PerformativeDispatcher(logger=self.logger)
         self._dispatchers_by_thread[thread_id].add_behaviour(beh)
-        logger.info("Added behavior %s with thread ID %s", beh, thread_id)
+        self.logger.debug("Added behavior %s with thread ID %s", beh, thread_id)
 
     def remove_behaviour(self, beh: MessageHandlingBehavior):
         """
@@ -119,7 +117,7 @@ class ThreadDispatcher(MessageDispatcher):
             self._dispatchers_by_thread[thread_id].remove_behaviour(beh)
             if self._dispatchers_by_thread[thread_id].is_empty:
                 del self._dispatchers_by_thread[thread_id]
-            logger.info("Removed behavior %s with thread ID %s", beh, thread_id)
+            self.logger.debug("Removed behavior %s with thread ID %s", beh, thread_id)
 
     def find_matching_behaviour(self, msg: Message):
         """
@@ -152,10 +150,12 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     _is_completed: asyncio.Event  # Event flag indicating completion
     _thread: Optional[threading.Thread] = None  # Store reference to the thread
     _agent_type: str  # New private variable for agent_type
+    logger: logging.Logger
 
     def __init__(self, agent_type: str):  # Updated constructor signature
         self._agent_type = agent_type  # Assign agent_type during initialization
-        self._dispatcher = ThreadDispatcher()
+        self.logger = logging.getLogger(self._agent_type)
+        self._dispatcher = ThreadDispatcher(logger=self.logger)
         self._behaviors = []
         self._is_stopped = asyncio.Event()
         self._is_completed = asyncio.Event()
@@ -218,7 +218,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         beh.setup(self)
         if self.is_running():
             beh.start()
-        logger.info("Added behavior %s to agent %s", beh, self)
+        self.logger.info("Added behavior %s to agent %s", beh, self)
 
     def remove_behaviour(self, beh: Behaviour):
         """
@@ -229,10 +229,10 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             self._behaviors.remove(beh)
             if isinstance(beh, MessageHandlingBehavior):
                 self._dispatcher.remove_behaviour(beh)
-            logger.info("Removed behavior %s from agent %s", beh, self)
+            self.logger.info("Removed behavior %s from agent %s", beh, self)
 
     async def handle_message(self, context, message):
-        logger.debug("Handling message: %s", message)
+        self.logger.debug("Handling message: %s", message)
         callback = lambda: asyncio.ensure_future(self._handle_message_in_loop(context, message))
         self.loop.call_soon_threadsafe(callback)
 
@@ -248,14 +248,14 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
                 done_behaviors.append(matched_behavior)
         for behavior in done_behaviors:
             self.remove_behaviour(behavior)
-        logger.debug("Handled message: %s", message)
+        self.logger.debug("Handled message: %s", message)
 
     def stop(self):
         """
         Stops the agent by stopping the event loop and signaling completion.
         """
         self._is_stopped.set()
-        logger.info("%s stopped.", self.__class__.__name__)
+        self.logger.info("%s stopped.", self.__class__.__name__)
 
     async def join(self):
         """
