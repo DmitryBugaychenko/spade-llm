@@ -138,10 +138,12 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
     _loop: AbstractEventLoop
     _dispatcher: ThreadDispatcher
     _behaviors: list[Behaviour]  # Internal list for storing non-MHB Behaviors
+    _is_done: threading.Event  # Event flag indicating completion
 
     def __init__(self):
         self._dispatcher = ThreadDispatcher()
         self._behaviors = []
+        self._is_done = threading.Event()  # Initialize the event flag
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -212,3 +214,16 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
                 done_behaviors.append(matched_behavior)
         for behavior in done_behaviors:
             self.remove_behaviour(behavior)
+
+    def stop(self):
+        """
+        Stops the agent by stopping the event loop and signaling completion.
+        """
+        self._loop.stop()
+        self._is_done.set()
+
+    def join(self):
+        """
+        Waits for the agent to complete its operations.
+        """
+        self._is_done.wait()
