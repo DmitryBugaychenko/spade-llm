@@ -191,6 +191,9 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(self._is_done.wait())
+        
+        # Signal that the task is completed
+        self._is_completed = True
 
     def add_behaviour(self, beh: Behaviour):
         """
