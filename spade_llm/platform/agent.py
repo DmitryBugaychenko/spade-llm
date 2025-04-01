@@ -203,8 +203,10 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Runs the event loop in a separate thread.
         """
+        self.logger.info("Started agent thread")
         asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(self._is_stopped.wait())
+        self.logger.info("Exiting agent thread")
         self._is_completed.set()
 
     def add_behaviour(self, beh: Behaviour):
@@ -218,7 +220,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         beh.setup(self)
         if self.is_running():
             beh.start()
-        self.logger.info("Added behavior %s to agent %s", beh, self)
+        self.logger.debug("Added behavior %s to agent %s", beh, self)
 
     def remove_behaviour(self, beh: Behaviour):
         """
@@ -229,7 +231,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             self._behaviors.remove(beh)
             if isinstance(beh, MessageHandlingBehavior):
                 self._dispatcher.remove_behaviour(beh)
-            self.logger.info("Removed behavior %s from agent %s", beh, self)
+            self.logger.debug("Removed behavior %s from agent %s", beh, self)
 
     async def handle_message(self, context, message):
         self.logger.debug("Handling message: %s", message)
