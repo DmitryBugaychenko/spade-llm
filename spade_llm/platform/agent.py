@@ -171,6 +171,13 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         return self._loop
 
+    @property
+    def default_context(self) -> Optional[AgentContext]:
+        """
+        Getter for the default context.
+        """
+        return self._default_context
+
     def setup(self):
         """
         Setup method to initialize agent and construct all default behaviors.
