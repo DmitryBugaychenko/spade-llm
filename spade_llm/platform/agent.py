@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 from asyncio import AbstractEventLoop
 from typing import Dict, List, Optional
 
-from spade_llm.platform.api import MessageHandler, Message
+from spade_llm.platform.api import Message, AgentHandler
 from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
 
 class MessageDispatcher(metaclass=ABCMeta):
@@ -116,7 +116,7 @@ class ThreadDispatcher(MessageDispatcher):
         Yields all matching behaviors for the given message.
         """
         thread_id = msg.thread_id
-        if thread_id in self._dispatchers_by_thread:
+        if thread_id and thread_id in self._dispatchers_by_thread:
             for beh in self._dispatchers_by_thread[thread_id].find_matching_behaviour(msg):
                 yield beh
         if None in self._dispatchers_by_thread:
@@ -130,7 +130,7 @@ class ThreadDispatcher(MessageDispatcher):
         """
         return len(self._dispatchers_by_thread) == 0
 
-class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
+class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     """
     Base class for all agents. Provide asyncio event loop for execution, adds and removes
     behaviors, handle messages by dispatching them to interested behaviours
@@ -138,7 +138,8 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
     _loop: AbstractEventLoop
     _dispatcher: ThreadDispatcher
     _behaviors: list[Behaviour]  # Internal list for storing non-MHB Behaviors
-    _is_done: asyncio.Event  # Event flag indicating completion
+    _is_stopped: asyncio.Event  # Event flag indicating completion
+    _is_completed: asyncio.Event  # Event flag indicating completion
     _thread: Optional[threading.Thread] = None  # Store reference to the thread
     _agent_type: str  # New private variable for agent_type
 
@@ -146,10 +147,11 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         self._agent_type = agent_type  # Assign agent_type during initialization
         self._dispatcher = ThreadDispatcher()
         self._behaviors = []
-        self._is_done = asyncio.Event()  # Initialize the event flag
+        self._is_stopped = asyncio.Event()
+        self._is_completed = asyncio.Event()
 
     @property
-    def agent_type(self) -> str:  # Read-only getter for agent_type
+    def agent_type(self) -> str:
         return self._agent_type
 
     @property
@@ -169,6 +171,8 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         Creates a new event loop, starts a new thread, runs the event loop in the thread,
         and calls run_until_complete for the loop.
         """
+        self.setup()
+
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
             target=self._run_agent_in_thread,
@@ -190,10 +194,8 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         Runs the event loop in a separate thread.
         """
         asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self._is_done.wait())
-        
-        # Signal that the task is completed
-        self._is_completed = True
+        self.loop.run_until_complete(self._is_stopped.wait())
+        self._is_completed.set()
 
     def add_behaviour(self, beh: Behaviour):
         """
@@ -204,6 +206,8 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         if isinstance(beh, MessageHandlingBehavior):
             self._dispatcher.add_behaviour(beh)
         beh.setup(self)
+        if self.is_running():
+            beh.start()
 
     def remove_behaviour(self, beh: Behaviour):
         """
@@ -216,6 +220,10 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
                 self._dispatcher.remove_behaviour(beh)
 
     async def handle_message(self, context, message):
+        callback = lambda: asyncio.ensure_future(self._handle_message_in_loop(context,message))
+        self.loop.call_soon_threadsafe(callback)
+
+    async def _handle_message_in_loop(self, context, message):
         """
         Tries to find behavior(s) matching message and passes message to each of them. Afterward checks if behavior(s) are
         done and if so removes them.
@@ -232,15 +240,14 @@ class Agent(MessageHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Stops the agent by stopping the event loop and signaling completion.
         """
-        self._loop.stop()
-        self._is_done.set()
+        self._is_stopped.set()
 
     async def join(self):
         """
         Waits for the agent to complete its operations.
         """
         if self._thread:
-            await self._thread.join()
+            await self._is_completed.wait()
 
     def is_running(self) -> bool:
         """
