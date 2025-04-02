@@ -1,4 +1,5 @@
 import asyncio
+import json
 import unittest
 
 from pydantic import BaseModel, Field
@@ -45,11 +46,14 @@ class NestedConfigurable(Configurable[NestedConfig]):
     pass
 
 class TestConfig(unittest.TestCase):
+    def yaml_to_json(self, s: str):
+        data = yaml.full_load(s)
+        return json.dumps(data)
     
     def test_configurable_parse_config(self):
         expected = StringConfig(s="str")
 
-        conf = StringConfigurable.parse_config(yaml.dump(expected.dict()))
+        conf = StringConfigurable.parse_config(expected.model_dump_json())
 
         self.assertEqual(expected, conf)
 
@@ -58,7 +62,7 @@ class TestConfig(unittest.TestCase):
         type_name: tests.test_config.StringConfigurable
         s: str
         '''
-        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
         parsed = conf.create_instance()
 
@@ -70,7 +74,7 @@ class TestConfig(unittest.TestCase):
         type_name: tests.test_config.IntConfigurable
         i: 42
         '''
-        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
         parsed = conf.create_instance()
 
@@ -83,7 +87,7 @@ class TestConfig(unittest.TestCase):
         s: hello
         i: 100
         '''
-        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
         parsed = conf.create_instance()
 
@@ -99,7 +103,7 @@ class TestConfig(unittest.TestCase):
         integer_part:
           i: 123
         '''
-        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
         parsed = conf.create_instance()
 
