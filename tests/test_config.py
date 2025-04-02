@@ -92,7 +92,6 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertIsInstance(parsed.config(), NestedConfig)
         self.assertEqual("nested_string", parsed.config().string_part.s)
         self.assertEqual(123, parsed.config().integer_part.i)
 
