@@ -1,7 +1,7 @@
 import ssl
 
 from spade_llm.platform.conf import configuration, Configurable
-from spade_llm.platform.models import ChatModelFactory, ChatModelConfiguration
+from spade_llm.platform.models import ChatModelFactory, ChatModelConfiguration, EmbeddingsModelConfiguration
 from pydantic import Field
 from typing import List, Optional
 
@@ -9,6 +9,9 @@ from langchain_gigachat.chat_models import GigaChat
 from langchain_gigachat import GigaChatEmbeddings
 
 class GigaChatModelConfig(ChatModelConfiguration):
+    """
+    Configuration for GigaChat connection.
+    """
     temperature: Optional[float] = Field(default=None, description="Sampling temperature for controlling randomness during generation.")
     top_p: Optional[float] = Field(default=None, description="Probability threshold for nucleus sampling.")
     n: Optional[int] = Field(default=None, description="Number of completions to generate per prompt.")
@@ -51,10 +54,47 @@ class GigaChatModelConfig(ChatModelConfiguration):
 @configuration(GigaChatModelConfig)
 class GigaChatModelFactory(ChatModelFactory[GigaChat], Configurable[GigaChatModelConfig]):
 
-    def __init__(self, config: GigaChatModelConfig):
-        super().__init__()
-        self._config = config
 
     def create_model(self) -> GigaChat:
-        config_dict = self.config().dict(exclude_none=True)
+        config = self.config
+        config_dict = config.inject_env_dict(
+            keys = ["access_token", "password", "key_file_password", "credentials"],
+            conf = config.model_dump(exclude_none=True))
         return GigaChat(**config_dict)
+
+class GigaChatEmbeddingsConf(EmbeddingsModelConfiguration):
+    base_url: Optional[str] = None
+    """ Base API URL """
+    auth_url: Optional[str] = None
+    """ Auth URL """
+    credentials: Optional[str] = None
+    """ Auth Token """
+    scope: Optional[str] = None
+    """ Permission scope for access token """
+
+    access_token: Optional[str] = None
+    """ Access token for GigaChat """
+
+    model: Optional[str] = None
+    """Model name to use."""
+    user: Optional[str] = None
+    """ Username for authenticate """
+    password: Optional[str] = None
+    """ Password for authenticate """
+
+    timeout: Optional[float] = 600
+    """ Timeout for request. By default it works for long requests. """
+    verify_ssl_certs: Optional[bool] = None
+    """ Check certificates for all requests """
+
+    ca_bundle_file: Optional[str] = None
+    cert_file: Optional[str] = None
+    key_file: Optional[str] = None
+    key_file_password: Optional[str] = None
+    # Support for connection to GigaChat through SSL certificates
+
+    prefix_query: str = (
+        "Дано предложение, необходимо найти его парафраз \nпредложение: "
+    )
+
+    use_prefix_query: bool = False
