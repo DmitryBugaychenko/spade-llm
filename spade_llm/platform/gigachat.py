@@ -63,38 +63,19 @@ class GigaChatModelFactory(ChatModelFactory[GigaChat], Configurable[GigaChatMode
         return GigaChat(**config_dict)
 
 class GigaChatEmbeddingsConf(EmbeddingsModelConfiguration):
-    base_url: Optional[str] = None
-    """ Base API URL """
-    auth_url: Optional[str] = None
-    """ Auth URL """
-    credentials: Optional[str] = None
-    """ Auth Token """
-    scope: Optional[str] = None
-    """ Permission scope for access token """
-
-    access_token: Optional[str] = None
-    """ Access token for GigaChat """
-
-    model: Optional[str] = None
-    """Model name to use."""
-    user: Optional[str] = None
-    """ Username for authenticate """
-    password: Optional[str] = None
-    """ Password for authenticate """
-
-    timeout: Optional[float] = 600
-    """ Timeout for request. By default it works for long requests. """
-    verify_ssl_certs: Optional[bool] = None
-    """ Check certificates for all requests """
-
-    ca_bundle_file: Optional[str] = None
-    cert_file: Optional[str] = None
-    key_file: Optional[str] = None
-    key_file_password: Optional[str] = None
-    # Support for connection to GigaChat through SSL certificates
-
-    prefix_query: str = (
-        "Дано предложение, необходимо найти его парафраз \nпредложение: "
-    )
-
-    use_prefix_query: bool = False
+    base_url: Optional[str] = Field(None, description="Base API URL")
+    auth_url: Optional[str] = Field(None, description="Auth URL")
+    credentials: Optional[str] = Field(None, description="Auth Token")
+    scope: Optional[str] = Field(None, description="Permission scope for access token")
+    access_token: Optional[str] = Field(None, description="Access token for GigaChat")
+    model: Optional[str] = Field(None, description="Model name to use.")
+    user: Optional[str] = Field(None, description="Username for authenticate")
+    password: Optional[str] = Field(None, description="Password for authenticate")
+    timeout: Optional[float] = Field(600, description="Timeout for request. By default it works for long requests.")
+    verify_ssl_certs: Optional[bool] = Field(None, description="Check certificates for all requests")
+    ca_bundle_file: Optional[str] = Field(None, description="CA bundle file for SSL verification")
+    cert_file: Optional[str] = Field(None, description="Client-side TLS certificate file")
+    key_file: Optional[str] = Field(None, description="Private key corresponding to the client-side certificate")
+    key_file_password: Optional[str] = Field(None, description="Password for encrypted private key")
+    prefix_query: str = Field("Дано предложение, необходимо найти его парафраз \nпредложение: ", description="Prefix query for paraphrase task")
+    use_prefix_query: bool = Field(False, description="Use prefix query flag") 
