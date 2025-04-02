@@ -2,6 +2,7 @@ import asyncio
 import unittest
 
 from pydantic import BaseModel, Field
+import yaml
 
 from spade_llm.platform.behaviors import (
     Behaviour,
@@ -48,14 +49,16 @@ class TestConfig(unittest.TestCase):
     def test_configurable_parse_config(self):
         expected = StringConfig(s="str")
 
-        conf = StringConfigurable.parse_config(expected.model_dump_json())
+        conf = StringConfigurable.parse_config(yaml.dump(expected.dict()))
 
         self.assertEqual(expected, conf)
 
     def test_configurable_load_string_config(self):
-        conf = ConfigurableRecord.model_validate_json(
-            '{"type_name": "tests.test_config.StringConfigurable", "s": "str"}'
-        )
+        conf_yaml = '''
+        type_name: tests.test_config.StringConfigurable
+        s: str
+        '''
+        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
 
         parsed = conf.create_instance()
 
@@ -63,9 +66,11 @@ class TestConfig(unittest.TestCase):
         
     # Newly added test case for IntConfig
     def test_configurable_load_int_config(self):
-        conf = ConfigurableRecord.model_validate_json(
-            '{"type_name": "tests.test_config.IntConfigurable", "i": 42}'
-        )
+        conf_yaml = '''
+        type_name: tests.test_config.IntConfigurable
+        i: 42
+        '''
+        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
 
         parsed = conf.create_instance()
 
@@ -73,9 +78,12 @@ class TestConfig(unittest.TestCase):
         
     # Newly added test case for MultipleConfig
     def test_configurable_load_multiple_config(self):
-        conf = ConfigurableRecord.model_validate_json(
-            '{"type_name": "tests.test_config.MultipleConfigurable", "s": "hello", "i": 100}'
-        )
+        conf_yaml = '''
+        type_name: tests.test_config.MultipleConfigurable
+        s: hello
+        i: 100
+        '''
+        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
 
         parsed = conf.create_instance()
 
@@ -84,11 +92,14 @@ class TestConfig(unittest.TestCase):
 
     # Unit test for NestedConfigurable
     def test_configurable_load_nested_config(self):
-        conf = ConfigurableRecord.model_validate_json(
-            '{"type_name": "tests.test_config.NestedConfigurable", '
-            '"string_part": {"s": "nested_string"}, '
-            '"integer_part": {"i": 123}}'
-        )
+        conf_yaml = '''
+        type_name: tests.test_config.NestedConfigurable
+        string_part:
+          s: nested_string
+        integer_part:
+          i: 123
+        '''
+        conf = ConfigurableRecord.model_validate_yaml(conf_yaml)
 
         parsed = conf.create_instance()
 
