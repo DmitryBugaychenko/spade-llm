@@ -1,8 +1,8 @@
 import importlib
-from typing import Self
-
+from typing import TypeVar, Callable, Any, Optional
 from pydantic import BaseModel, Field
 
+T = TypeVar('T', bound='Configurable')
 
 def configuration(config: type[BaseModel]):
     """
@@ -23,17 +23,17 @@ def configuration(config: type[BaseModel]):
 
     return decorator
 
-class Configurable[T: BaseModel]:
+class Configurable(BaseModel):
     """
     Mixin used to provide access to the configuration for the configurable object
     """
-    def config(self) -> T:
+    def config(self) -> BaseModel:
         """
         :return: Configuration to use
         """
         return self._config
 
-    def _configure(self, config: T) -> Self:
+    def _configure(self, config: BaseModel) -> 'Configurable':
         self._config = config
         self.configure()
         return self
@@ -44,11 +44,34 @@ class Configurable[T: BaseModel]:
         after constructor.
         """
 
-
 class ConfigurableRecord(BaseModel, extra="allow"):
     type_name: str = Field(description="Name of the class to instantiate for this record")
 
     def create_instance(self) -> Configurable:
-        module_name, class_name = self.type_name.rsplit(".", 1)
-        my_class = getattr(importlib.import_module(module_name), class_name)
-        return my_class()._configure(my_class.parse_config(self.model_dump_json()))
+        # Check if type_name follows the proper format
+        if '.' not in self.type_name:
+            raise ValueError(f"type_name '{self.type_name}' must follow the format '<module>.<class>'")
+
+        module_name, class_name = self.type_name.rsplit('.', 1)
+
+        # Try importing the specified module
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:
+            raise ImportError(f"Module '{module_name}' could not be imported.")
+
+        # Get the class from the module
+        cls = getattr(module, class_name, None)
+        if cls is None:
+            raise AttributeError(f"Class '{class_name}' does not exist in module '{module_name}'.")
+
+        # Ensure the class is derived from Configurable
+        if not issubclass(cls, Configurable):
+            raise TypeError(f"Class '{cls.__name__}' must inherit from 'Configurable'.")
+
+        # Verify that the class has a 'parse_config' class method
+        if not hasattr(cls, 'parse_config') or not callable(getattr(cls, 'parse_config')):
+            raise AttributeError(f"Class '{cls.__name__}' lacks a valid 'parse_config' class method.")
+
+        # Create and configure the instance
+        return cls()._configure(cls.parse_config(self.model_dump_json()))
