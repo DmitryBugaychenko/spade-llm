@@ -21,14 +21,15 @@ class LlmConfiguration(ConfigurableRecord):
         else:
             return val
 
-    def inject_env_dict(self, keys: list[str], dict: dict[str, Any]):
+    def inject_env_dict(self, keys: list[str], conf: dict[str, Any]):
         """
         For each key in keys list check if it is mentioned in dict and applies inject_env to its value.
         Used to substitute credentials from environment variables.
         """
         for key in keys:
-            if key in dict:
-                dict[key] = self.inject_env(dict[key])
+            if key in conf:
+                conf[key] = self.inject_env(conf[key])
+        return conf
 
 class ChatModelFactory[T: BaseChatModel](metaclass=ABCMeta):
     @abstractmethod
