@@ -61,7 +61,7 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertEqual(42, parsed.i)
+        self.assertEqual(42, parsed.config().i)
         
     # Newly added test case for MultipleConfig
     def test_configurable_load_multiple_config(self):
@@ -71,8 +71,8 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertEqual("hello", parsed.s)
-        self.assertEqual(100, parsed.i)
+        self.assertEqual("hello", parsed.config().s)
+        self.assertEqual(100, parsed.config().i)
 
 
 if __name__ == "__main__":
