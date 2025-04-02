@@ -1,18 +1,9 @@
-import asyncio
 import json
 import unittest
 
-from pydantic import BaseModel, Field
 import yaml
+from pydantic import BaseModel, Field
 
-from spade_llm.platform.behaviors import (
-    Behaviour,
-    BehaviorsOwner,
-    MessageTemplate,
-    Message,
-    MessageHandlingBehavior,
-)
-from spade_llm.platform.api import AgentId
 from spade_llm.platform.conf import Configurable, configuration, ConfigurableRecord
 
 
@@ -64,12 +55,56 @@ class TestConfig(unittest.TestCase):
 
     def test_configurable_load_string_config(self):
         conf_yaml = '''
-        type_name: tests.test_config.StringConfigurable
-        s: str
-        '''
+            type_name: tests.test_config.StringConfigurable
+            s: str
+            '''
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
         parsed = conf.create_instance()
+
         self.assertEqual("str", parsed.config().s)
+
+    # Newly added test case for IntConfig
+    def test_configurable_load_int_config(self):
+        conf_yaml = '''
+            type_name: tests.test_config.IntConfigurable
+            i: 42
+            '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        parsed = conf.create_instance()
+
+        self.assertEqual(42, parsed.config().i)
+
+        # Newly added test case for MultipleConfig
+    def test_configurable_load_multiple_config(self):
+        conf_yaml = '''
+            type_name: tests.test_config.MultipleConfigurable
+            s: hello
+            i: 100
+            '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        parsed = conf.create_instance()
+
+        self.assertEqual("hello", parsed.config().s)
+        self.assertEqual(100, parsed.config().i)
+
+        # Unit test for NestedConfigurable
+    def test_configurable_load_nested_config(self):
+        conf_yaml = '''
+            type_name: tests.test_config.NestedConfigurable
+            string_part:
+              s: nested_string
+            integer_part:
+              i: 123
+            '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        parsed = conf.create_instance()
+
+        self.assertEqual("nested_string", parsed.config().string_part.s)
+        self.assertEqual(123, parsed.config().integer_part.i)
 
     def test_configurable_load_invalid_type_name(self):
         conf_yaml = '''

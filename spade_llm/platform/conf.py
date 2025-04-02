@@ -1,8 +1,8 @@
 import importlib
-from typing import TypeVar, Callable, Any, Optional
+from typing import Self
+
 from pydantic import BaseModel, Field
 
-T = TypeVar('T', bound='Configurable')
 
 def configuration(config: type[BaseModel]):
     """
@@ -23,17 +23,17 @@ def configuration(config: type[BaseModel]):
 
     return decorator
 
-class Configurable(BaseModel):
+class Configurable[T](BaseModel):
     """
     Mixin used to provide access to the configuration for the configurable object
     """
-    def config(self) -> BaseModel:
+    def config(self) -> T:
         """
         :return: Configuration to use
         """
         return self._config
 
-    def _configure(self, config: BaseModel) -> 'Configurable':
+    def _configure(self, config: BaseModel) -> Self:
         self._config = config
         self.configure()
         return self
