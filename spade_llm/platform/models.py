@@ -26,6 +26,9 @@ class LlmConfiguration(ConfigurableRecord):
         For each key in keys list check if it is mentioned in dict and applies inject_env to its value.
         Used to substitute credentials from environment variables.
         """
+        for key in keys:
+            if key in dict:
+                dict[key] = self.inject_env(dict[key])
 
 class ChatModelFactory[T: BaseChatModel](metaclass=ABCMeta):
     @abstractmethod
