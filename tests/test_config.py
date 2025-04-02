@@ -24,7 +24,15 @@ class StringConfigurable(Configurable[StringConfig]):
 class IntConfig(BaseModel):
     i: int = Field(description="Single int field configuration for testing")
 
+@configuration(IntConfig)
+class IntConfigurable(Configurable[IntConfig]):
+    pass
+
 class MultipleConfig(StringConfig, IntConfig):
+    pass
+
+@configuration(MultipleConfig)
+class MultipleConfigurable(Configurable[MultipleConfig]):
     pass
 
 class TestConfig(unittest.TestCase):
@@ -48,7 +56,7 @@ class TestConfig(unittest.TestCase):
     # Newly added test case for IntConfig
     def test_configurable_load_int_config(self):
         conf = ConfigurableRecord.model_validate_json(
-            '{"type_name": "tests.test_config.IntConfig", "i": 42}'
+            '{"type_name": "tests.test_config.IntConfigurable", "i": 42}'
         )
 
         parsed = conf.create_instance()
@@ -58,7 +66,7 @@ class TestConfig(unittest.TestCase):
     # Newly added test case for MultipleConfig
     def test_configurable_load_multiple_config(self):
         conf = ConfigurableRecord.model_validate_json(
-            '{"type_name": "tests.test_config.MultipleConfig", "s": "hello", "i": 100}'
+            '{"type_name": "tests.test_config.MultipleConfigurable", "s": "hello", "i": 100}'
         )
 
         parsed = conf.create_instance()
