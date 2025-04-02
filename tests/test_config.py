@@ -28,8 +28,7 @@ class MultipleConfig(StringConfig, IntConfig):
     pass
 
 class TestConfig(unittest.TestCase):
-
-
+    
     def test_configurable_parse_config(self):
         expected = StringConfig(s="str")
 
@@ -38,12 +37,34 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(expected, conf)
 
     def test_configurable_load_string_config(self):
-        conf = ConfigurableRecord.model_validate_json('{"type_name":"tests.test_config.StringConfigurable", "s":"str"}')
+        conf = ConfigurableRecord.model_validate_json(
+            '{"type_name": "tests.test_config.StringConfigurable", "s": "str"}'
+        )
 
         parsed = conf.create_instance()
 
         self.assertEqual("str", parsed.config().s)
+        
+    # Newly added test case for IntConfig
+    def test_configurable_load_int_config(self):
+        conf = ConfigurableRecord.model_validate_json(
+            '{"type_name": "tests.test_config.IntConfig", "i": 42}'
+        )
 
+        parsed = conf.create_instance()
+
+        self.assertEqual(42, parsed.i)
+        
+    # Newly added test case for MultipleConfig
+    def test_configurable_load_multiple_config(self):
+        conf = ConfigurableRecord.model_validate_json(
+            '{"type_name": "tests.test_config.MultipleConfig", "s": "hello", "i": 100}'
+        )
+
+        parsed = conf.create_instance()
+
+        self.assertEqual("hello", parsed.s)
+        self.assertEqual(100, parsed.i)
 
 
 if __name__ == "__main__":
