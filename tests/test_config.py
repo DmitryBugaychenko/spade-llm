@@ -31,6 +31,9 @@ class IntConfigurable(Configurable[IntConfig]):
 class MultipleConfig(StringConfig, IntConfig):
     pass
 
+class NestedConfig(StringConfig):
+    nested: IntConfig = Field(description="Test for nested configuration")
+
 @configuration(MultipleConfig)
 class MultipleConfigurable(Configurable[MultipleConfig]):
     pass
