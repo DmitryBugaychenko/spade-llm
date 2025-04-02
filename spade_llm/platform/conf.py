@@ -27,6 +27,7 @@ class Configurable[T](BaseModel):
     """
     Mixin used to provide access to the configuration for the configurable object
     """
+    @property
     def config(self) -> T:
         """
         :return: Configuration to use

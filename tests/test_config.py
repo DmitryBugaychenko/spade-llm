@@ -62,7 +62,7 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertEqual("str", parsed.config().s)
+        self.assertEqual("str", parsed.config.s)
 
     # Newly added test case for IntConfig
     def test_configurable_load_int_config(self):
@@ -74,7 +74,7 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertEqual(42, parsed.config().i)
+        self.assertEqual(42, parsed.config.i)
 
         # Newly added test case for MultipleConfig
     def test_configurable_load_multiple_config(self):
@@ -87,8 +87,8 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertEqual("hello", parsed.config().s)
-        self.assertEqual(100, parsed.config().i)
+        self.assertEqual("hello", parsed.config.s)
+        self.assertEqual(100, parsed.config.i)
 
         # Unit test for NestedConfigurable
     def test_configurable_load_nested_config(self):
@@ -103,8 +103,8 @@ class TestConfig(unittest.TestCase):
 
         parsed = conf.create_instance()
 
-        self.assertEqual("nested_string", parsed.config().string_part.s)
-        self.assertEqual(123, parsed.config().integer_part.i)
+        self.assertEqual("nested_string", parsed.config.string_part.s)
+        self.assertEqual(123, parsed.config.integer_part.i)
 
     def test_configurable_load_invalid_type_name(self):
         conf_yaml = '''
