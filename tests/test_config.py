@@ -31,11 +31,16 @@ class IntConfigurable(Configurable[IntConfig]):
 class MultipleConfig(StringConfig, IntConfig):
     pass
 
-class NestedConfig(StringConfig):
-    nested: IntConfig = Field(description="Test for nested configuration")
-
 @configuration(MultipleConfig)
 class MultipleConfigurable(Configurable[MultipleConfig]):
+    pass
+
+class NestedConfig(BaseModel):
+    string_part: StringConfig = Field(description="The string part of the nested config.")
+    integer_part: IntConfig = Field(description="The integer part of the nested config.")
+
+@configuration(NestedConfig)
+class NestedConfigurable(Configurable[NestedConfig]):
     pass
 
 class TestConfig(unittest.TestCase):
@@ -76,6 +81,20 @@ class TestConfig(unittest.TestCase):
 
         self.assertEqual("hello", parsed.config().s)
         self.assertEqual(100, parsed.config().i)
+
+    # Unit test for NestedConfigurable
+    def test_configurable_load_nested_config(self):
+        conf = ConfigurableRecord.model_validate_json(
+            '{"type_name": "tests.test_config.NestedConfigurable", '
+            '"string_part": {"s": "nested_string"}, '
+            '"integer_part": {"i": 123}}'
+        )
+
+        parsed = conf.create_instance()
+
+        self.assertIsInstance(parsed.config(), NestedConfig)
+        self.assertEqual("nested_string", parsed.config().string_part.s)
+        self.assertEqual(123, parsed.config().integer_part.i)
 
 
 if __name__ == "__main__":
