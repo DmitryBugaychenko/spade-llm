@@ -27,5 +27,5 @@ class GigaChatModelFactory(ChatModelFactory[GigaChat], Configurable[GigaChatMode
         self._config = config
 
     def create_model(self) -> GigaChat:
-        config: GigaChatModelConfig = self.config()
-        return GigaChat(**config.dict(exclude_none=True))
+        config_dict = self.config().dict(exclude_none=True)
+        return GigaChat(**config_dict)
