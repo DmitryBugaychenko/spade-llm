@@ -9,61 +9,44 @@ from langchain_gigachat.chat_models import GigaChat
 from langchain_gigachat import GigaChatEmbeddings
 
 class GigaChatModelConfig(ChatModelConfiguration):
-    temperature: Optional[float] = Field(default=None, description="What sampling temperature to use.")
-    top_p: Optional[float] = Field(default=None, description="Total probability mass of tokens to consider at each step.")
-    n: Optional[int] = Field(default=None, description="How many chat completion choices to generate for each input message.")
-    stream: Optional[bool] = Field(default=False, description="Whether to stream back partial progress.")
-    stop: Optional[List[str]] = Field(default=None, description="Sequences where the API will stop generating further tokens.")
-    max_tokens: Optional[int] = Field(default=None, description="The maximum number of tokens allowed for the generated answer.")
-    presence_penalty: Optional[float] = Field(default=None, description="Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.")
-    frequency_penalty: Optional[float] = Field(default=None, description="Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far.")
-    logit_bias: Optional[dict] = Field(default={}, description="Modify the likelihood of specified tokens appearing in the completion.")
-    user: Optional[str] = Field(default="", description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse.")
-
-    base_url: Optional[str] = None
-    """ Base API URL """
-    auth_url: Optional[str] = None
-    """ Auth URL """
-    credentials: Optional[str] = None
-    """ Auth Token """
-    scope: Optional[str] = None
-    """ Permission scope for access token """
-
-    access_token: Optional[str] = None
-    """ Access token for GigaChat """
-
-    model: Optional[str] = None
-    """Model name to use."""
-
-    password: Optional[str] = None
-    """ Password for authenticate """
-
-    timeout: Optional[float] = None
-    """ Timeout for request """
-    verify_ssl_certs: Optional[bool] = None
-    """ Check certificates for all requests """
-
-    ca_bundle_file: Optional[str] = None
-    cert_file: Optional[str] = None
-    key_file: Optional[str] = None
-    key_file_password: Optional[str] = None
-
-    profanity: bool = True
-    """ DEPRECATED: Check for profanity """
-    profanity_check: Optional[bool] = None
-    """ Check for profanity """
-    streaming: bool = False
-    """ Whether to stream the results or not. """
-    use_api_for_tokens: bool = False
-    """ Use GigaChat API for tokens count """
-    verbose: bool = False
-    """ Verbose logging """
-    flags: Optional[List[str]] = None
-    """ Feature flags """
-    repetition_penalty: Optional[float] = None
-    """ The penalty applied to repeated tokens """
-    update_interval: Optional[float] = None
-    """ Minimum interval in seconds that elapses between sending tokens """
+    temperature: Optional[float] = Field(default=None, description="Sampling temperature for controlling randomness during generation.")
+    top_p: Optional[float] = Field(default=None, description="Probability threshold for nucleus sampling.")
+    n: Optional[int] = Field(default=None, description="Number of completions to generate per prompt.")
+    stream: Optional[bool] = Field(default=False, description="Enable streaming mode for real-time response updates.")
+    stop: Optional[List[str]] = Field(default=None, description="List of sequences marking the end of a completion.")
+    max_tokens: Optional[int] = Field(default=None, description="Maximum number of tokens to include in the generated response.")
+    presence_penalty: Optional[float] = Field(default=None, description="Penalty factor for discouraging repetitive responses.")
+    frequency_penalty: Optional[float] = Field(default=None, description="Penalty factor for reducing frequent word usage.")
+    logit_bias: Optional[dict] = Field(default={}, description="Custom bias adjustments for specific tokens.")
+    user: Optional[str] = Field(default="", description="Unique identifier associated with the requesting user.")
+    
+    base_url: Optional[str] = Field(default=None, description="Root URL for accessing Gigachat services.")
+    auth_url: Optional[str] = Field(default=None, description="URL endpoint for authentication purposes.")
+    credentials: Optional[str] = Field(default=None, description="Authentication credentials required for authorization.")
+    scope: Optional[str] = Field(default=None, description="Scope defining permissions granted upon successful authentication.")
+    
+    access_token: Optional[str] = Field(default=None, description="Access token obtained after authenticating successfully.")
+    
+    model: Optional[str] = Field(default=None, description="Name of the pre-trained model being utilized.")
+    
+    password: Optional[str] = Field(default=None, description="Password string used alongside username for basic authentication.")
+    
+    timeout: Optional[float] = Field(default=None, description="Timeout duration (in seconds) before cancelling pending requests.")
+    verify_ssl_certs: Optional[bool] = Field(default=None, description="Flag indicating whether SSL certificate verification should occur.")
+    
+    ca_bundle_file: Optional[str] = Field(default=None, description="Path to custom CA bundle file containing trusted root certificates.")
+    cert_file: Optional[str] = Field(default=None, description="Path to client-side TLS certificate file.")
+    key_file: Optional[str] = Field(default=None, description="Path to private key corresponding to the client-side certificate.")
+    key_file_password: Optional[str] = Field(default=None, description="Optional password protecting encrypted private keys.")
+    
+    profanity: bool = Field(default=True, description="DEPRECATED: Flag enabling automatic detection and filtering of offensive language.")
+    profanity_check: Optional[bool] = Field(default=None, description="Enables explicit checking for potentially inappropriate content.")
+    streaming: bool = Field(default=False, description="Indicates preference towards receiving incremental data streams instead of complete outputs.")
+    use_api_for_tokens: bool = Field(default=False, description="Specifies reliance on external APIs rather than local methods when counting tokens.")
+    verbose: bool = Field(default=False, description="Controls level of detail included within logs and diagnostic information.")
+    flags: Optional[List[str]] = Field(default=None, description="Collection of feature-specific activation switches.")
+    repetition_penalty: Optional[float] = Field(default=None, description="Factor influencing how heavily penalties apply against repeating patterns.")
+    update_interval: Optional[float] = Field(default=None, description="Minimum time gap enforced between consecutive updates sent via streaming channels.")
 
 @configuration(GigaChatModelConfig)
 class GigaChatModelFactory(ChatModelFactory[GigaChat], Configurable[GigaChatModelConfig]):
