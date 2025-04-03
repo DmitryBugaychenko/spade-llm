@@ -27,14 +27,14 @@ class TestGigaChat(unittest.TestCase):
     def test_chat(self):
         conf_yaml = '''
             type_name: spade_llm.platform.gigachat.GigaChatModelFactory
-            name: GigaChat-2
-            credentials: env.GIGA_CRED
-            model: GigaChat-2
-            verify_ssl_certs: False
+            args:
+              credentials: env.GIGA_CRED
+              model: GigaChat-2
+              verify_ssl_certs: False
             '''
         conf = LlmConfiguration.model_validate_json(self.yaml_to_json(conf_yaml))
 
-        model: BaseChatModel = conf.create_instance().create_model()
+        model: BaseChatModel = conf.create_configurable_instance().create_model()
 
         structured_llm = model.with_structured_output(self.Joke)
 
@@ -45,13 +45,13 @@ class TestGigaChat(unittest.TestCase):
     def test_embeddings(self):
         conf_yaml = '''
                 type_name: spade_llm.platform.gigachat.GigaChatEmbeddingsFactory
-                name: GigaChatEmbeddings
-                credentials: env.GIGA_CRED
-                verify_ssl_certs: False
+                args:
+                  credentials: env.GIGA_CRED
+                  verify_ssl_certs: False
                 '''
         conf = EmbeddingsModelConfiguration.model_validate_json(self.yaml_to_json(conf_yaml))
 
-        model: GigaChatEmbeddings = conf.create_instance().create_model()
+        model: GigaChatEmbeddings = conf.create_configurable_instance().create_model()
 
         embedding = model.embed_query("Some short text")
         print(embedding)

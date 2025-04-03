@@ -3,6 +3,7 @@ import unittest
 
 import yaml
 from pydantic import BaseModel, Field
+from pydantic_core import ValidationError
 
 from spade_llm.platform.conf import Configurable, configuration, ConfigurableRecord
 
@@ -145,6 +146,70 @@ class TestConfig(unittest.TestCase):
         with self.assertRaises(AttributeError):  
             conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
             conf.create_configurable_instance()
+
+    def test_create_basemodel_instance_valid(self):
+        conf_yaml = '''
+                type_name: test_config.StringConfig
+                args:
+                  s: str
+                '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+        instance = conf.create_basemodel_instance()
+
+        self.assertIsInstance(instance, StringConfig)
+        self.assertEqual(instance.s, 'str')
+
+    def test_create_basemodel_instance_missing_args(self):
+        conf_yaml = '''
+                type_name: test_config.StringConfig
+                '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        with self.assertRaises(ValueError):
+            conf.create_basemodel_instance()
+
+    def test_create_basemodel_instance_wrong_arg_type(self):
+        conf_yaml = '''
+                type_name: test_config.IntConfig
+                args:
+                  i: "string_not_number"
+                '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        with self.assertRaises(ValueError):
+            conf.create_basemodel_instance()
+
+    def test_create_basemodel_instance_non_existent_class(self):
+        conf_yaml = '''
+                type_name: non.existent.module.Class
+                args:
+                  arg: value
+                '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        with self.assertRaises((ImportError, AttributeError)):
+            conf.create_basemodel_instance()
+
+    def test_create_kwargs_instance_valid(self):
+        conf_yaml = '''
+                    type_name: test_config.StringConfig
+                    args:
+                      s: str
+                    '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+        instance = conf.create_kwargs_instance(StringConfig)
+
+        self.assertIsInstance(instance, StringConfig)
+        self.assertEqual(instance.s, 'str')
+
+    def test_create_kwargs_instance_missing_field(self):
+        conf_yaml = '''
+                    type_name: test_config.StringConfig
+                    '''
+        conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
+
+        with self.assertRaises(ValidationError):
+            conf.create_kwargs_instance(StringConfig)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 import importlib
-from typing import Self
+from typing import Self, Any
 
 from pydantic import BaseModel, Field
 
@@ -45,10 +45,19 @@ class Configurable[T](BaseModel):
         after constructor.
         """
 
-class ConfigurableRecord(BaseModel, extra="allow"):
-    type_name: str = Field(description="Name of the class to instantiate for this record")
+class Args(BaseModel, extra="allow"):
+    """
+    Placeholder to capture specific configuration attributes as extra attributes
+    """
 
-    def create_instance(self) -> Configurable:
+class ConfigurableRecord(BaseModel):
+    type_name: str = Field(description="Name of the class to instantiate for this record")
+    args: Args = Field(default=Args(), description="Arguments to pass to the created object")
+
+    def _get_args(self):
+        return self.args
+
+    def _get_class(self):
         # Check if type_name follows the proper format
         if '.' not in self.type_name:
             raise ValueError(f"type_name '{self.type_name}' must follow the format '<module>.<class>'")
@@ -66,6 +75,31 @@ class ConfigurableRecord(BaseModel, extra="allow"):
         if cls is None:
             raise AttributeError(f"Class '{class_name}' does not exist in module '{module_name}'.")
 
+        return cls
+
+    def create_kwargs_instance(self, expected_class) -> Any:
+        cls = self._get_class()
+
+        # Ensure the class is derived from Configurable
+        if not issubclass(cls, expected_class):
+            raise TypeError(f"Class '{cls.__name__}' must inherit from '{expected_class.__name__}'.")
+
+        # Create and configure the instance
+        return cls(**(self._get_args().model_extra))
+
+    def create_basemodel_instance(self) -> BaseModel:
+        cls = self._get_class()
+
+        # Ensure the class is derived from Configurable
+        if not issubclass(cls, BaseModel):
+            raise TypeError(f"Class '{cls.__name__}' must inherit from 'BaseModel'.")
+
+        # Create and configure the instance
+        return cls.model_validate_json(self._get_args().model_dump_json())
+
+    def create_configurable_instance(self) -> Configurable:
+        cls = self._get_class()
+
         # Ensure the class is derived from Configurable
         if not issubclass(cls, Configurable):
             raise TypeError(f"Class '{cls.__name__}' must inherit from 'Configurable'.")
@@ -75,4 +109,4 @@ class ConfigurableRecord(BaseModel, extra="allow"):
             raise AttributeError(f"Class '{cls.__name__}' lacks a valid 'parse_config' class method.")
 
         # Create and configure the instance
-        return cls()._configure(cls.parse_config(self.model_dump_json()))
+        return cls()._configure(cls.parse_config(self._get_args().model_dump_json()))

@@ -1,5 +1,4 @@
 from abc import ABCMeta, abstractmethod
-from email.policy import default
 from typing import Optional
 
 from pydantic import Field, BaseModel
@@ -15,13 +14,30 @@ class ToolConfigurationRecord(ConfigurableRecord):
         instance = self.create_configurable_instance()
         return instance
 
-class ToolProviderConfig(BaseModel):
+
+class ToolProvider(metaclass=ABCMeta):
+    @abstractmethod
+    def create_tool(self, name):
+        """
+        Creates a new instance of tool with given name using configuration
+        :param name: Name of the tool to create
+        :return: Created tool.
+        """
+        pass
+
+
+class ToolProviderConfig(BaseModel, ToolProvider):
     tools: dict[str,ToolConfigurationRecord] = Field(
         default = dict(),
         description="Dictionary with known tools and their configuration."
     )
     
     def create_tool(self, name: str) -> BaseTool:
+        """
+        Creates a new instance of tool with given name using configuration
+        :param name: Name of the tool to create
+        :return: Created tool.
+        """
         tool_record = self.tools.get(name)
         
         if tool_record is None:

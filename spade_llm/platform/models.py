@@ -1,11 +1,10 @@
 import os
 from abc import abstractmethod, ABCMeta
-from email.policy import default
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
-from pydantic import Field, BaseModel, ValidationError
+from pydantic import Field, BaseModel
 
 from spade_llm.platform.conf import ConfigurableRecord
 
@@ -46,8 +45,8 @@ class ChatModelFactory[T: BaseChatModel](metaclass=ABCMeta):
 
 
 class ChatModelConfiguration(LlmConfiguration):
-    def create_model(self) -> ChatModelFactory:
-        instance = self.create_instance()
+    def create_model_factory(self) -> ChatModelFactory:
+        instance = self.create_configurable_instance()
         return instance
 
 
@@ -58,11 +57,32 @@ class EmbeddingsModelFactory[T: Embeddings](metaclass=ABCMeta):
 
 
 class EmbeddingsModelConfiguration(LlmConfiguration):
-    def create_model(self) -> EmbeddingsModelFactory:
-        instance = self.create_instance()
+    def create_model_factory(self) -> EmbeddingsModelFactory:
+        instance = self.create_configurable_instance()
         return instance
 
-class ModelsProviderConfig(BaseModel):
+
+class ModelsProvider(metaclass=ABCMeta):
+    @abstractmethod
+    def create_chat_model(self, name):
+        """
+        Lookups configuration with given name and creates chat model using it.
+        :param name: Name of the chat model to lookup
+        :return: Instance of BaseChatModel configured according to configuration with given name
+        """
+        pass
+
+    @abstractmethod
+    def create_embeddings_model(self, name):
+        """
+        Lookups configuration with given name and creates embeddings model using it.
+        :param name: Name of the embeddings model to lookup
+        :return: Instance of embeddings configured according to configuration with given name
+        """
+        pass
+
+
+class ModelsProviderConfig(BaseModel, ModelsProvider):
     chat_models: dict[str,ChatModelConfiguration] = Field(
         default = dict(),
         description="LLM models available to use as chat LLM"
@@ -84,7 +104,7 @@ class ModelsProviderConfig(BaseModel):
             raise ValueError(f"No such chat model '{name}' found.")
         
         # Get the corresponding factory and create the model
-        factory = self.chat_models[name].create_model()
+        factory = self.chat_models[name].create_model_factory()
         return factory.create_model()
 
     def create_embeddings_model(self, name: str) -> Embeddings:
@@ -98,5 +118,5 @@ class ModelsProviderConfig(BaseModel):
             raise ValueError(f"No such embeddings model '{name}' found.")
         
         # Get the corresponding factory and create the model
-        factory = self.embeddings_models[name].create_model()
+        factory = self.embeddings_models[name].create_model_factory()
         return factory.create_model()
