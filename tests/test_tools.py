@@ -5,7 +5,10 @@ import yaml
 from langchain_community.tools import WikipediaQueryRun
 
 from spade_llm.platform.conf import ConfigurableRecord
-from spade_llm.platform.tools import LangChainApiWrapperToolFactory
+from spade_llm.platform.tools import (
+    LangChainApiWrapperToolFactory,
+    ToolProviderConfig,
+)
 
 
 class TestConfig(unittest.TestCase):
@@ -25,10 +28,8 @@ class TestConfig(unittest.TestCase):
                   lang: en
                 name: wikipedia_api
             '''
-    
-    def test_wikipedia_argument_validation(self):
 
-        
+    def test_wikipedia_argument_validation(self):
         # Convert YAML to JSON and load into ConfigurableRecord
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(self.conf_yaml))
 
@@ -56,6 +57,25 @@ class TestConfig(unittest.TestCase):
         # Test invoking the WikipediaQueryRun tool
         result = wiki.run("Python programming language")
         self.assertIn("Python", result)
+
+    def test_tool_provider_config(self):
+        config_data = {
+            "tools": {
+                "wikipedia": ConfigurableRecord.model_validate({
+                    "type_name": "spade_llm.platform.tools.LangChainApiWrapperToolFactory",
+                    "args": {
+                        "type_name": "langchain_community.tools.WikipediaQueryRun",
+                        "api_wrapper": {
+                            "type_name": "langchain_community.utilities.WikipediaAPIWrapper",
+                            "args": {"top_k_results": 1}
+                        }
+                    }
+                })
+            }
+        }
+        provider_config = ToolProviderConfig(**config_data)
+        tool = provider_config.create_tool("wikipedia")
+        self.assertIsInstance(tool, WikipediaQueryRun)
 
 if __name__ == "__main__":
     unittest.main()
