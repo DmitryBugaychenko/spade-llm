@@ -20,6 +20,15 @@ class ToolProviderConfig(BaseModel):
         default = dict(),
         description="Dictionary with known tools and their configuration."
     )
+    
+    def create_tool(self, name: str) -> BaseTool:
+        tool_record = self.tools.get(name)
+        
+        if tool_record is None:
+            raise ValueError(f"No tool found with name '{name}'")
+            
+        factory = tool_record.create_factory()
+        return factory.create_tool()
 
 class LangChainApiWrapperTool(ConfigurableRecord):
     """
