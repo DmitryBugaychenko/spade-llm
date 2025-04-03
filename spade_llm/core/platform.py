@@ -4,7 +4,7 @@ from uuid import UUID
 
 from langchain_core.tools import BaseTool
 
-from spade_llm.platform.api import (
+from spade_llm.core.api import (
     AgentHandler,
     AgentPlatform,
     KeyValueStorage,
@@ -12,8 +12,8 @@ from spade_llm.platform.api import (
     MessageSource,
     StorageFactory,
 )
-from spade_llm.platform.context import AgentContextImpl
-from spade_llm.platform.storage import PrefixKeyValueStorage
+from spade_llm.core.context import AgentContextImpl
+from spade_llm.core.storage import PrefixKeyValueStorage
 
 
 class AgentPlatformImpl(AgentPlatform):

@@ -4,13 +4,16 @@ from typing import List, Optional
 
 from langchain_core.tools import BaseTool
 
-from spade_llm.platform.api import KeyValueStorage, MessageService, Message, AgentContext
-from spade_llm.platform.storage import PrefixKeyValueStorage, TransientKeyValueStorage
+from spade_llm.core.api import KeyValueStorage, MessageService, Message, AgentContext
+from spade_llm.core.storage import PrefixKeyValueStorage, TransientKeyValueStorage
 
 
 class AgentContextImpl(AgentContext):
 
-    def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService, tools: List[BaseTool] = []):
+    def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService,
+                 tools=None):
+        if tools is None:
+            tools = []
         self.kv_store = kv_store
         self.agent_id = agent_id
         self.thread_id = thread_id

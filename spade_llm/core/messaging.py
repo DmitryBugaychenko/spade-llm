@@ -1,23 +1,32 @@
 import asyncio
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
-from spade_llm.platform.api import MessageService, MessageSource, Message
+from spade_llm.core.api import MessageService, MessageSource, Message
+from spade_llm.core.conf import configuration, Configurable, ConfigurableRecord, EmptyConfig
 
 
-class DictionaryMessageService(MessageService):
+class MessageServiceConfig(ConfigurableRecord):
+    def create_messaging_service(self) -> MessageService:
+        return cast(MessageService, self.create_configurable_instance())
+
+@configuration(EmptyConfig)
+class DictionaryMessageService(MessageService, Configurable[EmptyConfig]):
+    _sources: Dict[str, "MessageSourceImpl"]
+
     def __init__(self):
-        self.sources: Dict[str, MessageSourceImpl] = {}
+        super().__init__()
+        self._sources: Dict[str, MessageSourceImpl] = {}
 
     async def get_or_create_source(self, agent_type: str) -> MessageSource:
-        if agent_type not in self.sources:
-            self.sources[agent_type] = MessageSourceImpl(agent_type)
-        return self.sources[agent_type]
+        if agent_type not in self._sources:
+            self._sources[agent_type] = MessageSourceImpl(agent_type)
+        return self._sources[agent_type]
 
     async def post_message(self, msg: Message):
         agent_type = msg.receiver.agent_type
-        if agent_type not in self.sources:
+        if agent_type not in self._sources:
             raise Exception(f"No message source found for agent type '{agent_type}'")
-        source = self.sources[agent_type]
+        source = self._sources[agent_type]
         await source.post_message(msg)
 
 

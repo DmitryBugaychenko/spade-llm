@@ -1,13 +1,13 @@
 import asyncio
 import unittest
-from spade_llm.platform.behaviors import (
+from spade_llm.core.behaviors import (
     Behaviour,
     BehaviorsOwner,
     MessageTemplate,
     Message,
     MessageHandlingBehavior,
 )
-from spade_llm.platform.api import AgentId
+from spade_llm.core.api import AgentId
 
 class MockAgent(BehaviorsOwner):
     received_behaviour: MessageHandlingBehavior

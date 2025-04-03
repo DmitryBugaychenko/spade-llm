@@ -1,8 +1,8 @@
 import unittest
 
-from spade_llm.platform.api import AgentId
-from spade_llm.platform.api import Message
-from spade_llm.platform.messaging import MessageSourceImpl
+from spade_llm.core.api import AgentId
+from spade_llm.core.api import Message
+from spade_llm.core.messaging import MessageSourceImpl
 
 
 class TestMessageSourceImpl(unittest.IsolatedAsyncioTestCase):

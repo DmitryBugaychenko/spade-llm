@@ -7,7 +7,7 @@ from langchain_gigachat import GigaChatEmbeddings
 from langchain_core.language_models import BaseChatModel
 from pydantic import BaseModel, Field
 
-from spade_llm.platform.models import LlmConfiguration, EmbeddingsModelConfiguration
+from spade_llm.core.models import LlmConfiguration, EmbeddingsModelConfiguration
 
 
 class TestGigaChat(unittest.TestCase):

@@ -2,10 +2,10 @@ import logging
 import unittest
 import uuid
 from unittest.mock import MagicMock
-from spade_llm.platform.agent import PerformativeDispatcher, Message, \
+from spade_llm.core.agent import PerformativeDispatcher, Message, \
     MessageHandlingBehavior, ThreadDispatcher
-from spade_llm.platform.api import AgentId
-from spade_llm.platform.behaviors import MessageTemplate
+from spade_llm.core.api import AgentId
+from spade_llm.core.behaviors import MessageTemplate
 
 
 class MockBehavior(MessageHandlingBehavior):

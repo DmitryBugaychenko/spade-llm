@@ -3,7 +3,6 @@ from typing import Self, Any
 
 from pydantic import BaseModel, Field
 
-
 def configuration(config: type[BaseModel]):
     """
     Use this method as decorator to provide reference to pydantic model used to parse
@@ -23,7 +22,7 @@ def configuration(config: type[BaseModel]):
 
     return decorator
 
-class Configurable[T](BaseModel):
+class Configurable[T]:
     """
     Mixin used to provide access to the configuration for the configurable object
     """
@@ -101,12 +100,20 @@ class ConfigurableRecord(BaseModel):
         cls = self._get_class()
 
         # Ensure the class is derived from Configurable
-        if not issubclass(cls, Configurable):
-            raise TypeError(f"Class '{cls.__name__}' must inherit from 'Configurable'.")
+        # if not issubclass(cls, Configurable):
+        #     raise TypeError(f"Class '{cls.__name__}' must inherit from 'Configurable'.")
 
         # Verify that the class has a 'parse_config' class method
         if not hasattr(cls, 'parse_config') or not callable(getattr(cls, 'parse_config')):
             raise AttributeError(f"Class '{cls.__name__}' lacks a valid 'parse_config' class method.")
 
         # Create and configure the instance
-        return cls()._configure(cls.parse_config(self._get_args().model_dump_json()))
+        return self._create_instance(cls)._configure(cls.parse_config(self._get_args().model_dump_json()))
+
+    def _create_instance(self, cls):
+        return cls()
+
+class EmptyConfig(BaseModel):
+    """
+    Used for configurables which do not need any config
+    """

@@ -4,8 +4,8 @@ import unittest
 import yaml
 from langchain_community.tools import WikipediaQueryRun
 
-from spade_llm.platform.conf import ConfigurableRecord
-from spade_llm.platform.tools import (
+from spade_llm.core.conf import ConfigurableRecord
+from spade_llm.core.tools import (
     LangChainApiWrapperToolFactory,
     ToolProviderConfig,
 )

@@ -1,12 +1,12 @@
 import os
 from abc import abstractmethod, ABCMeta
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from pydantic import Field, BaseModel
 
-from spade_llm.platform.conf import ConfigurableRecord
+from spade_llm.core.conf import ConfigurableRecord
 
 
 class CredentialsUtils:
@@ -47,7 +47,7 @@ class ChatModelFactory[T: BaseChatModel](metaclass=ABCMeta):
 class ChatModelConfiguration(LlmConfiguration):
     def create_model_factory(self) -> ChatModelFactory:
         instance = self.create_configurable_instance()
-        return instance
+        return cast(ChatModelFactory, instance)
 
 
 class EmbeddingsModelFactory[T: Embeddings](metaclass=ABCMeta):
@@ -59,7 +59,7 @@ class EmbeddingsModelFactory[T: Embeddings](metaclass=ABCMeta):
 class EmbeddingsModelConfiguration(LlmConfiguration):
     def create_model_factory(self) -> EmbeddingsModelFactory:
         instance = self.create_configurable_instance()
-        return instance
+        return cast(EmbeddingsModelFactory, instance)
 
 
 class ModelsProvider(metaclass=ABCMeta):

@@ -1,0 +1,12 @@
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+agents:
+  echo:
+    type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+  console:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: echo
+wait_for_agents: [console]

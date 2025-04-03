@@ -5,7 +5,7 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_core import ValidationError
 
-from spade_llm.platform.conf import Configurable, configuration, ConfigurableRecord
+from spade_llm.core.conf import Configurable, configuration, ConfigurableRecord
 
 
 class StringConfig(BaseModel):

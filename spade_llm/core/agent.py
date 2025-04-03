@@ -9,8 +9,8 @@ import logging
 
 import aiologic
 
-from spade_llm.platform.api import Message, AgentHandler, AgentContext
-from spade_llm.platform.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
+from spade_llm.core.api import Message, AgentHandler, AgentContext
+from spade_llm.core.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
 
 class MessageDispatcher(metaclass=ABCMeta):
     @abstractmethod

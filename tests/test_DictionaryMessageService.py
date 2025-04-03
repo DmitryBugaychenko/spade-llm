@@ -1,8 +1,8 @@
 import unittest
 
-from spade_llm.platform.api import AgentId
-from spade_llm.platform.api import Message
-from spade_llm.platform.messaging import DictionaryMessageService
+from spade_llm.core.api import AgentId
+from spade_llm.core.api import Message
+from spade_llm.core.messaging import DictionaryMessageService
 
 
 class TestDictionaryMessageService(unittest.IsolatedAsyncioTestCase):

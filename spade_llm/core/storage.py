@@ -1,7 +1,15 @@
+from typing import cast
+
 from pydantic import BaseModel
-from spade_llm.platform.api import (
+from spade_llm.core.api import (
     KeyValueStorage, StorageFactory,
 )
+from spade_llm.core.conf import configuration, Configurable, ConfigurableRecord, EmptyConfig
+
+
+class StorageFactoryConfig(ConfigurableRecord):
+    def create_factory(self) -> StorageFactory:
+        return cast(StorageFactory, self.create_configurable_instance())
 
 class InMemoryKeyValueStorage(KeyValueStorage):
     async def close(self):
@@ -19,7 +27,8 @@ class InMemoryKeyValueStorage(KeyValueStorage):
         else:
             self._data[key] = value
 
-class InMemoryStorageFactory(StorageFactory):
+@configuration(EmptyConfig)
+class InMemoryStorageFactory(StorageFactory, Configurable[EmptyConfig]):
     async def create_storage(self, agent_type: str):
         return InMemoryKeyValueStorage()
 

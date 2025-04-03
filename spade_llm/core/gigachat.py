@@ -1,8 +1,8 @@
 from langchain_gigachat import GigaChatEmbeddings
 from langchain_gigachat.chat_models import GigaChat
 
-from spade_llm.platform.conf import configuration, Configurable
-from spade_llm.platform.models import ChatModelFactory, EmbeddingsModelFactory, CredentialsUtils
+from spade_llm.core.conf import configuration, Configurable
+from spade_llm.core.models import ChatModelFactory, EmbeddingsModelFactory, CredentialsUtils
 
 SENSITIVE_KEYS=["access_token", "password", "key_file_password", "credentials"]
 

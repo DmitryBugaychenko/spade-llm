@@ -1,5 +1,5 @@
 import unittest
-from spade_llm.platform.storage import InMemoryKeyValueStorage, PrefixKeyValueStorage, TransientKeyValueStorage
+from spade_llm.core.storage import InMemoryKeyValueStorage, PrefixKeyValueStorage, TransientKeyValueStorage
 
 class TestPrefixKeyValueStorage(unittest.IsolatedAsyncioTestCase):
     async def test_get_item(self):

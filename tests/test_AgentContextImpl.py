@@ -1,8 +1,9 @@
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from uuid import UUID
-from spade_llm.platform.context import AgentContextImpl
-from spade_llm.platform.api import KeyValueStorage, MessageService, Message, AgentId
+
+from spade_llm.core.api import KeyValueStorage, MessageService, Message, AgentId
+from spade_llm.core.context import AgentContextImpl
 
 
 class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):

@@ -1,7 +1,7 @@
 # tests/test_models_provider_config.py
 
 import unittest
-from spade_llm.platform.models import (
+from spade_llm.core.models import (
     ModelsProviderConfig,
     ChatModelConfiguration,
     EmbeddingsModelConfiguration,

@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 import asyncio
 from typing import Optional, Callable
 
-from spade_llm.platform.api import MessageHandler, AgentContext, Message
+from spade_llm.core.api import MessageHandler, AgentContext, Message
 
 
 class BehaviorsOwner(metaclass=ABCMeta):
@@ -92,6 +92,7 @@ class Behaviour(metaclass=ABCMeta):
     handles it
     """
     _agent: BehaviorsOwner
+    _is_done: bool = False
 
     def __init__(self):
         self._completion_event = asyncio.Event()
@@ -113,6 +114,7 @@ class Behaviour(metaclass=ABCMeta):
         """
         Start behavior by scheduling its execution
         """
+        self._is_done = False
         self.schedule_execution()
 
     def schedule_execution(self):
@@ -152,7 +154,13 @@ class Behaviour(metaclass=ABCMeta):
         Returns True if behavior is completed and should not accept messages anymore,
         False otherwise.
         """
-        return False
+        return self._is_done
+
+    def set_is_done(self):
+        """
+        Used by inheritors to signal that this behavior is done.
+        """
+        self._is_done = True
     
     async def receive(self, template: MessageTemplate, timeout: float) -> Optional[Message]:
         """

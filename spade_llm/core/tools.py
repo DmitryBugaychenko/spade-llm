@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from typing import Optional
+from typing import Optional, cast
 
 from pydantic import Field, BaseModel
 from langchain_core.tools import BaseTool
 
-from spade_llm.platform.conf import ConfigurableRecord, Configurable, configuration
+from spade_llm.core.conf import ConfigurableRecord, Configurable, configuration
 
 class ToolConfigurationRecord(ConfigurableRecord):
     """
@@ -12,7 +12,7 @@ class ToolConfigurationRecord(ConfigurableRecord):
     """
     def create_factory(self) -> "ToolFactory":
         instance = self.create_configurable_instance()
-        return instance
+        return cast(ToolFactory, instance)
 
 
 class ToolProvider(metaclass=ABCMeta):
