@@ -29,18 +29,18 @@ class MockEmbeddingsModelConfiguration(EmbeddingsModelConfiguration):
 class TestModelsProviderConfig(unittest.TestCase):
     def setUp(self):
         self.valid_config = {
-            'chat_models': {'model1': MockChatModelConfiguration()},
-            'embeddings_models': {'embedding1': MockEmbeddingsModelConfiguration()}
+            'chat_models': {'mock_chat_model': MockChatModelConfiguration(type_name='mock_chat_model')},
+            'embeddings_models': {'mock_embeddings_model': MockEmbeddingsModelConfiguration(type_name='mock_embeddings_model')}
         }
         
         # Invalid configs remain unchanged since we still want to test error handling
         self.invalid_chat_model_config = {
             'chat_models': {},
-            'embeddings_models': {'embedding1': MockEmbeddingsModelConfiguration()}
+            'embeddings_models': {'mock_embeddings_model': MockEmbeddingsModelConfiguration(type_name='mock_embeddings_model')}
         }
         
         self.invalid_embedding_model_config = {
-            'chat_models': {'model1': MockChatModelConfiguration()},
+            'chat_models': {'mock_chat_model': MockChatModelConfiguration(type_name='mock_chat_model')},
             'embeddings_models': {}
         }
     
@@ -58,12 +58,12 @@ class TestModelsProviderConfig(unittest.TestCase):
     
     def test_create_chat_model(self):
         config = ModelsProviderConfig(**self.valid_config)
-        result = config.create_chat_model('model1')
+        result = config.create_chat_model('mock_chat_model')
         self.assertIsInstance(result, object)
     
     def test_create_embeddings_model(self):
         config = ModelsProviderConfig(**self.valid_config)
-        result = config.create_embeddings_model('embedding1')
+        result = config.create_embeddings_model('mock_embeddings_model')
         self.assertIsInstance(result, object)
 
 if __name__ == "__main__":
