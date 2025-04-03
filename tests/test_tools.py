@@ -38,9 +38,9 @@ class TestConfig(unittest.TestCase):
         wiki: WikipediaQueryRun = parsed.create_tool()
 
         # Validate that the arguments were properly set
-        self.assertEqual(wiki.top_k_results, 1)
-        self.assertEqual(wiki.doc_content_chars_max, 4096)
-        self.assertEqual(wiki.lang, 'en')
+        self.assertEqual(wiki.api_wrapper.top_k_results, 1)
+        self.assertEqual(wiki.api_wrapper.doc_content_chars_max, 4096)
+        self.assertEqual(wiki.api_wrapper.lang, 'en')
 
         # Test invoking the WikipediaQueryRun tool
         result = wiki.run("Python programming language")
