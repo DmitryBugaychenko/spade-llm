@@ -1,38 +1,66 @@
+# tests/test_models_provider_config.py
+
 import unittest
-from spade_llm.platform.models import ModelsProviderConfig, ChatModelConfiguration, EmbeddingsModelConfiguration
+from spade_llm.platform.models import (
+    ModelsProviderConfig,
+    ChatModelConfiguration,
+    EmbeddingsModelConfiguration,
+)
+
+# Implementing mock configurations
+class MockChatModelConfiguration(ChatModelConfiguration):
+    def create_model_factory(self):
+        # Return a dummy factory (for example purposes only)
+        class DummyFactory:
+            def create_model(self):
+                return object()  # Returns a generic object
+
+        return DummyFactory()
+
+class MockEmbeddingsModelConfiguration(EmbeddingsModelConfiguration):
+    def create_model_factory(self):
+        # Similar approach as above
+        class DummyFactory:
+            def create_model(self):
+                return object()  # Again, returns a generic object
+
+        return DummyFactory()
 
 class TestModelsProviderConfig(unittest.TestCase):
     def setUp(self):
         self.valid_config = {
-            'chat_models': {'model1': ChatModelConfiguration()},
-            'embeddings_models': {'embedding1': EmbeddingsModelConfiguration()}
+            'chat_models': {'model1': MockChatModelConfiguration()},
+            'embeddings_models': {'embedding1': MockEmbeddingsModelConfiguration()}
         }
+        
+        # Invalid configs remain unchanged since we still want to test error handling
         self.invalid_chat_model_config = {
             'chat_models': {},
-            'embeddings_models': {'embedding1': EmbeddingsModelConfiguration()}
+            'embeddings_models': {'embedding1': MockEmbeddingsModelConfiguration()}
         }
+        
         self.invalid_embedding_model_config = {
-            'chat_models': {'model1': ChatModelConfiguration()},
+            'chat_models': {'model1': MockChatModelConfiguration()},
             'embeddings_models': {}
         }
-
+    
     def test_valid_config(self):
         config = ModelsProviderConfig(**self.valid_config)
         self.assertIsInstance(config, ModelsProviderConfig)
-
+    
     def test_invalid_chat_model(self):
         with self.assertRaises(ValueError):
             ModelsProviderConfig(**self.invalid_chat_model_config).create_chat_model('nonexistent')
-
+    
     def test_invalid_embedding_model(self):
         with self.assertRaises(ValueError):
             ModelsProviderConfig(**self.invalid_embedding_model_config).create_embeddings_model('nonexistent')
-
+    
     def test_create_chat_model(self):
         config = ModelsProviderConfig(**self.valid_config)
         result = config.create_chat_model('model1')
         self.assertIsInstance(result, object)
-
+    
     def test_create_embeddings_model(self):
         config = ModelsProviderConfig(**self.valid_config)
         result = config.create_embeddings_model('embedding1')
