@@ -1,45 +1,42 @@
-import pytest
+import unittest
 from spade_llm.platform.models import ModelsProviderConfig, ChatModelConfiguration, EmbeddingsModelConfiguration
 
-@pytest.fixture
-def valid_config():
-    return {
-        'chat_models': {'model1': ChatModelConfiguration()},
-        'embeddings_models': {'embedding1': EmbeddingsModelConfiguration()}
-    }
+class TestModelsProviderConfig(unittest.TestCase):
+    def setUp(self):
+        self.valid_config = {
+            'chat_models': {'model1': ChatModelConfiguration()},
+            'embeddings_models': {'embedding1': EmbeddingsModelConfiguration()}
+        }
+        self.invalid_chat_model_config = {
+            'chat_models': {},
+            'embeddings_models': {'embedding1': EmbeddingsModelConfiguration()}
+        }
+        self.invalid_embedding_model_config = {
+            'chat_models': {'model1': ChatModelConfiguration()},
+            'embeddings_models': {}
+        }
 
-@pytest.fixture
-def invalid_chat_model_config():
-    return {
-        'chat_models': {},
-        'embeddings_models': {'embedding1': EmbeddingsModelConfiguration()}
-    }
+    def test_valid_config(self):
+        config = ModelsProviderConfig(**self.valid_config)
+        self.assertIsInstance(config, ModelsProviderConfig)
 
-@pytest.fixture
-def invalid_embedding_model_config():
-    return {
-        'chat_models': {'model1': ChatModelConfiguration()},
-        'embeddings_models': {}
-    }
+    def test_invalid_chat_model(self):
+        with self.assertRaises(ValueError):
+            ModelsProviderConfig(**self.invalid_chat_model_config).create_chat_model('nonexistent')
 
-def test_valid_config(valid_config):
-    config = ModelsProviderConfig(**valid_config)
-    assert isinstance(config, ModelsProviderConfig)
-    
-def test_invalid_chat_model(invalid_chat_model_config):
-    with pytest.raises(ValueError):
-        ModelsProviderConfig(**invalid_chat_model_config).create_chat_model('nonexistent')
+    def test_invalid_embedding_model(self):
+        with self.assertRaises(ValueError):
+            ModelsProviderConfig(**self.invalid_embedding_model_config).create_embeddings_model('nonexistent')
 
-def test_invalid_embedding_model(invalid_embedding_model_config):
-    with pytest.raises(ValueError):
-        ModelsProviderConfig(**invalid_embedding_model_config).create_embeddings_model('nonexistent')
+    def test_create_chat_model(self):
+        config = ModelsProviderConfig(**self.valid_config)
+        result = config.create_chat_model('model1')
+        self.assertIsInstance(result, object)
 
-def test_create_chat_model(valid_config):
-    config = ModelsProviderConfig(**valid_config)
-    result = config.create_chat_model('model1')
-    assert isinstance(result, object)
+    def test_create_embeddings_model(self):
+        config = ModelsProviderConfig(**self.valid_config)
+        result = config.create_embeddings_model('embedding1')
+        self.assertIsInstance(result, object)
 
-def test_create_embeddings_model(valid_config):
-    config = ModelsProviderConfig(**valid_config)
-    result = config.create_embeddings_model('embedding1')
-    assert isinstance(result, object)
+if __name__ == "__main__":
+    unittest.main()
