@@ -5,7 +5,7 @@ from typing import Any
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, ValidationError
 
 from spade_llm.platform.conf import ConfigurableRecord
 
@@ -79,6 +79,13 @@ class ModelsProviderConfig(BaseModel):
         :param name: Name of the chat model to lookup
         :return: Instance of BaseChatModel configured according to configuration with given name
         """
+        # Check if the specified chat model exists
+        if name not in self.chat_models:
+            raise ValueError(f"No such chat model '{name}' found.")
+        
+        # Get the corresponding factory and create the model
+        factory = self.chat_models[name].create_model()
+        return factory.create_model()
 
     def create_embeddings_model(self, name: str) -> Embeddings:
         """
@@ -86,3 +93,10 @@ class ModelsProviderConfig(BaseModel):
         :param name: Name of the embeddings model to lookup
         :return: Instance of embeddings configured according to configuration with given name
         """
+        # Check if the specified embeddings model exists
+        if name not in self.embeddings_models:
+            raise ValueError(f"No such embeddings model '{name}' found.")
+        
+        # Get the corresponding factory and create the model
+        factory = self.embeddings_models[name].create_model()
+        return factory.create_model()
