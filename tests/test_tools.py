@@ -59,21 +59,18 @@ class TestConfig(unittest.TestCase):
         self.assertIn("Python", result)
 
     def test_tool_provider_config(self):
-        config_data = {
-            "tools": {
-                "wikipedia": ConfigurableRecord.model_validate({
-                    "type_name": "spade_llm.platform.tools.LangChainApiWrapperToolFactory",
-                    "args": {
-                        "type_name": "langchain_community.tools.WikipediaQueryRun",
-                        "api_wrapper": {
-                            "type_name": "langchain_community.utilities.WikipediaAPIWrapper",
-                            "args": {"top_k_results": 1}
-                        }
-                    }
-                })
-            }
-        }
-        provider_config = ToolProviderConfig(**config_data)
+        config_yaml = '''
+        tools:
+          wikipedia:
+            type_name: spade_llm.platform.tools.LangChainApiWrapperToolFactory
+            args:
+              type_name: langchain_community.tools.WikipediaQueryRun
+              api_wrapper:
+                type_name: langchain_community.utilities.WikipediaAPIWrapper
+                args:
+                  top_k_results: 1
+        '''
+        provider_config = ToolProviderConfig.model_validate(yaml.safe_load(config_yaml))
         tool = provider_config.create_tool("wikipedia")
         self.assertIsInstance(tool, WikipediaQueryRun)
 
