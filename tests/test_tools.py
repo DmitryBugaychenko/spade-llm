@@ -14,6 +14,7 @@ class TestConfig(unittest.TestCase):
         return json.dumps(data)
 
     def test_wikipedia_run(self):
+        # Load the YAML configuration string
         conf_yaml = '''
             type_name: spade_llm.platform.tools.LangChainApiWrapperToolFactory
             args:
@@ -26,12 +27,24 @@ class TestConfig(unittest.TestCase):
                   lang: en
                 name: wikipedia_api
             '''
+        
+        # Convert YAML to JSON and load into ConfigurableRecord
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
+        # Create the LangChainApiWrapperToolFactory instance
         parsed: LangChainApiWrapperToolFactory = conf.create_configurable_instance()
 
+        # Get the WikipediaQueryRun tool
         wiki: WikipediaQueryRun = parsed.create_tool()
-        self.assertIsInstance(wiki, WikipediaQueryRun)
+
+        # Validate that the arguments were properly set
+        self.assertEqual(wiki.top_k_results, 1)
+        self.assertEqual(wiki.doc_content_chars_max, 4096)
+        self.assertEqual(wiki.lang, 'en')
+
+        # Test invoking the WikipediaQueryRun tool
+        result = wiki.run("Python programming language")
+        self.assertTrue(result.startswith('Python'))
 
 if __name__ == "__main__":
     unittest.main()
