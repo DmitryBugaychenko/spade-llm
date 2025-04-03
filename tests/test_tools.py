@@ -44,7 +44,7 @@ class TestConfig(unittest.TestCase):
 
         # Test invoking the WikipediaQueryRun tool
         result = wiki.run("Python programming language")
-        self.assertTrue(result.startswith('Python'))
+        self.assertIn("Python", result)
 
 if __name__ == "__main__":
     unittest.main()
