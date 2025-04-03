@@ -56,11 +56,12 @@ class TestConfig(unittest.TestCase):
     def test_configurable_load_string_config(self):
         conf_yaml = '''
             type_name: tests.test_config.StringConfigurable
-            s: str
+            args:
+              s: str
             '''
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
-        parsed = conf.create_instance()
+        parsed = conf.create_configurable_instance()
 
         self.assertEqual("str", parsed.config.s)
 
@@ -68,11 +69,12 @@ class TestConfig(unittest.TestCase):
     def test_configurable_load_int_config(self):
         conf_yaml = '''
             type_name: tests.test_config.IntConfigurable
-            i: 42
+            args:
+              i: 42
             '''
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
-        parsed = conf.create_instance()
+        parsed = conf.create_configurable_instance()
 
         self.assertEqual(42, parsed.config.i)
 
@@ -80,12 +82,13 @@ class TestConfig(unittest.TestCase):
     def test_configurable_load_multiple_config(self):
         conf_yaml = '''
             type_name: tests.test_config.MultipleConfigurable
-            s: hello
-            i: 100
+            args:
+              s: hello
+              i: 100
             '''
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
-        parsed = conf.create_instance()
+        parsed = conf.create_configurable_instance()
 
         self.assertEqual("hello", parsed.config.s)
         self.assertEqual(100, parsed.config.i)
@@ -94,14 +97,15 @@ class TestConfig(unittest.TestCase):
     def test_configurable_load_nested_config(self):
         conf_yaml = '''
             type_name: tests.test_config.NestedConfigurable
-            string_part:
-              s: nested_string
-            integer_part:
-              i: 123
+            args:
+              string_part:
+                s: nested_string
+              integer_part:
+                i: 123
             '''
         conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
 
-        parsed = conf.create_instance()
+        parsed = conf.create_configurable_instance()
 
         self.assertEqual("nested_string", parsed.config.string_part.s)
         self.assertEqual(123, parsed.config.integer_part.i)
@@ -112,7 +116,7 @@ class TestConfig(unittest.TestCase):
         '''
         with self.assertRaises((ImportError, AttributeError)):
             conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
-            conf.create_instance()
+            conf.create_configurable_instance()
 
     def test_configurable_missing_required_field(self):
         conf_yaml = '''
@@ -120,25 +124,27 @@ class TestConfig(unittest.TestCase):
         '''
         with self.assertRaises(ValueError):  
             conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
-            conf.create_instance()
+            conf.create_configurable_instance()
 
     def test_configurable_incorrect_field_type(self):
         conf_yaml = '''
         type_name: tests.test_config.IntConfigurable
-        i: "not_an_integer"
+        args:
+          i: "not_an_integer"
         '''
         with self.assertRaises(ValueError): 
             conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
-            conf.create_instance()
+            conf.create_configurable_instance()
 
     def test_configurable_no_configuration_decorator(self):
         conf_yaml = '''
         type_name: tests.test_config.InvalidConfigurable
-        x: 3.14
+        args:
+          x: 3.14
         '''
         with self.assertRaises(AttributeError):  
             conf = ConfigurableRecord.model_validate_json(self.yaml_to_json(conf_yaml))
-            conf.create_instance()
+            conf.create_configurable_instance()
 
 if __name__ == "__main__":
     unittest.main()
