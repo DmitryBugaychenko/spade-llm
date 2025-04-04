@@ -59,7 +59,7 @@ class AgentPlatformImpl(AgentPlatform):
     def create_context(self, handler: AgentHandler, agent_id: str, thread_id: Optional[UUID]  ):
         kv_store = PrefixKeyValueStorage(self.storages[handler.agent_type], agent_id)
         tools = self.tools_by_agent.get(handler.agent_type, [])
-        context = AgentContextImpl(kv_store, agent_id, thread_id, self.message_service, tools=tools)
+        context = AgentContextImpl(kv_store, handler.agent_type, agent_id, thread_id, self.message_service, tools=tools)
         return context
 
     async def shutdown(self):

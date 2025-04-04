@@ -10,7 +10,7 @@ class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
     async def test_fork_thread_creates_new_context_with_new_thread_id(self):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
-        original_context = AgentContextImpl(kv_store_mock, "original_agent_id", UUID("123e4567-e89b-12d3-a456-426655440000"), message_service_mock)
+        original_context = AgentContextImpl(kv_store_mock, "type", "original_agent_id", UUID("123e4567-e89b-12d3-a456-426655440000"), message_service_mock)
         
         new_context = await original_context.fork_thread()
         
@@ -21,7 +21,7 @@ class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
     async def test_close_thread_clears_thread_id_and_closes_prefix_storage(self):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
-        original_context = AgentContextImpl(kv_store_mock, "original_agent_id", UUID("123e4567-e89b-12d3-a456-426655440000"), message_service_mock)
+        original_context = AgentContextImpl(kv_store_mock, "type", "original_agent_id", UUID("123e4567-e89b-12d3-a456-426655440000"), message_service_mock)
         thread_context_mock = AsyncMock()
         original_context._thread_kv_store = thread_context_mock
         
@@ -34,7 +34,7 @@ class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
 
-        context = AgentContextImpl(kv_store_mock, "test_agent_id", None, message_service_mock)
+        context = AgentContextImpl(kv_store_mock, "type", "test_agent_id", None, message_service_mock)
 
         sender = AgentId(agent_type="sender-type", agent_id="sender-id")
         receiver = AgentId(agent_type="receiver-type", agent_id="receiver-id")
@@ -48,7 +48,7 @@ class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
     async def test_get_item_delegates_to_kv_store(self):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
-        context = AgentContextImpl(kv_store_mock, "test_agent_id", None, message_service_mock)
+        context = AgentContextImpl(kv_store_mock, "type", "test_agent_id", None, message_service_mock)
         
         result = await context.get_item("some_key")
         
@@ -58,7 +58,7 @@ class TestAgentContextImpl(unittest.IsolatedAsyncioTestCase):
     async def test_put_item_delegates_to_kv_store(self):
         kv_store_mock = AsyncMock(spec=KeyValueStorage)
         message_service_mock = AsyncMock(spec=MessageService)
-        context = AgentContextImpl(kv_store_mock, "test_agent_id", None, message_service_mock)
+        context = AgentContextImpl(kv_store_mock, "type", "test_agent_id", None, message_service_mock)
         
         await context.put_item("some_key", "some_value")
         

@@ -10,32 +10,31 @@ from spade_llm.core.storage import PrefixKeyValueStorage, TransientKeyValueStora
 
 class AgentContextImpl(AgentContext):
 
-    def __init__(self, kv_store: KeyValueStorage, agent_id: str, thread_id: Optional[UUID], message_service: MessageService,
+    def __init__(self, kv_store: KeyValueStorage, agent_type: str, agent_id: str, thread_id: Optional[UUID], message_service: MessageService,
                  tools=None):
+
         if tools is None:
             tools = []
         self.kv_store = kv_store
-        self.agent_id = agent_id
-        self.thread_id = thread_id
+        self._agent_id = agent_id
+        self._agent_type = agent_type
+        self._thread_id = thread_id
         self.message_service = message_service
         self.tools = tools
-        self._thread_kv_store: Optional[PrefixKeyValueStorage] = None  
+        self._thread_kv_store: Optional[PrefixKeyValueStorage] = None
+
+    @property
+    def agent_type(self) -> str:
+        return self._agent_type
+
 
     @property
     def agent_id(self) -> str:
         return self._agent_id
 
-    @agent_id.setter
-    def agent_id(self, value: str):
-        self._agent_id = value
-
     @property
     def thread_id(self) -> Optional[UUID]:
         return self._thread_id
-
-    @thread_id.setter
-    def thread_id(self, value: Optional[UUID]):
-        self._thread_id = value
 
     @property
     def has_thread(self) -> bool:
@@ -53,14 +52,14 @@ class AgentContextImpl(AgentContext):
 
     async def fork_thread(self) -> "AgentContextImpl":
         new_thread_id = uuid.uuid4()
-        new_context = AgentContextImpl(self.kv_store, self.agent_id, new_thread_id, self.message_service)
+        new_context = AgentContextImpl(self.kv_store, self.agent_type, self.agent_id, new_thread_id, self.message_service)
         return new_context
 
     async def close_thread(self) -> "AgentContextImpl":
         if self._thread_kv_store:
             await self._thread_kv_store.close()
             self._thread_kv_store = None
-        self.thread_id = None
+        self._thread_id = None
         return self
 
     async def send(self, message: Message):

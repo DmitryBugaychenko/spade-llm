@@ -1,9 +1,12 @@
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import Optional
+from typing import Optional, Self, Any
 
 from langchain_core.tools import BaseTool
+from multipledispatch import dispatch
 from pydantic import BaseModel, Field
+
+from spade_llm import consts
 
 
 class AgentId(BaseModel):
@@ -22,6 +25,115 @@ class Message(BaseModel):
     metadata: dict[str, str] = Field(description="Arbitrary extra information about message.", default=dict())
     # TODO: Allow for typed content with raw nested JSON
     content: str = Field(description="Content of the message")
+
+class MessageBuilder:
+    _message: dict[str,Any]
+
+    def __init__(self, performative: str):
+        self._message = {consts.PERFORMATIVE : performative}
+
+    @staticmethod
+    def request() -> "MessageBuilder":
+        return MessageBuilder(consts.REQUEST)
+
+    @staticmethod
+    def request_proposal() -> "MessageBuilder":
+        return MessageBuilder(consts.REQUEST_PROPOSAL)
+
+    @staticmethod
+    def inform() -> "MessageBuilder":
+        return MessageBuilder(consts.INFORM)
+
+    @staticmethod
+    def acknowledge() -> "MessageBuilder":
+        return MessageBuilder(consts.ACKNOWLEDGE)
+
+    @staticmethod
+    def failure() -> "MessageBuilder":
+        return MessageBuilder(consts.FAILURE)
+
+    @staticmethod
+    def propose() -> "MessageBuilder":
+        return MessageBuilder(consts.PROPOSE)
+
+    @staticmethod
+    def accept() -> "MessageBuilder":
+        return MessageBuilder(consts.ACCEPT)
+
+    @staticmethod
+    def refuse() -> "MessageBuilder":
+        return MessageBuilder(consts.REFUSE)
+
+    @staticmethod
+    def reply_with_inform(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .inform()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_ack(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .acknowledge()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_failure(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .failure()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_propose(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .propose()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_accept(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .accept()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    @staticmethod
+    def reply_with_refuse(msg: Message) -> "MessageBuilder":
+        return (MessageBuilder
+                .refuse()
+                .to_agent(msg.sender)
+                .from_agent(msg.to)
+                .in_thread(msg.thread))
+
+    def in_thread(self, thread: uuid.UUID) -> Self:
+        self._message["thread_id"] = thread
+        return self
+
+    def to_agent(self, to_agent: AgentId) -> Self:
+        self._message["receiver"] = to_agent
+        return self
+
+    def from_agent(self, from_agent: AgentId) -> Self:
+        self._message["sender"] = from_agent
+        return self
+
+
+    @dispatch(str)
+    def with_content(self, body: str) -> Message:
+        self._message["content"] = body
+        return Message(**self._message)
+
+    @dispatch(BaseModel)
+    def with_content(self, body: BaseModel) -> Message:
+        self._message["content"] = body.model_dump_json()
+        return Message(**self._message)
 
 class KeyValueStorage(metaclass=ABCMeta):
     @abstractmethod
@@ -131,6 +243,15 @@ class AgentContext(KeyValueStorage, metaclass=ABCMeta):
     storage, thread (conversation) context, adds ability to send messages, start and stop threads, and
     execute tools while filling context-related parameters automatically.
     """
+
+    @property
+    @abstractmethod
+    def agent_type(self) -> str:
+        """
+        Type of the agent context is created for. Used to address messages
+        """
+        pass
+
     @property
     @abstractmethod
     def agent_id(self) -> str:
@@ -197,6 +318,47 @@ class AgentContext(KeyValueStorage, metaclass=ABCMeta):
         are automatically provided.
         """
         pass
+
+    def create_message_builder(self, performative: str) -> MessageBuilder:
+        """
+        Creates a new builder for a message, initializes sender and thread
+        """
+        bld = MessageBuilder(performative).from_agent(
+            AgentId(agent_type = self.agent_type, agent_id = self.agent_id))
+        if self.has_thread:
+            return bld.in_thread(self.thread_id)
+        else:
+            return bld
+
+    def inform(self, receiver: AgentId) -> MessageBuilder:
+        return self.create_message_builder(consts.INFORM).to_agent(receiver)
+
+    def request(self, receiver: AgentId) -> MessageBuilder:
+        return self.create_message_builder(consts.REQUEST).to_agent(receiver)
+
+    def request_proposal(self, receiver: AgentId) -> MessageBuilder:
+        return self.create_message_builder(consts.REQUEST_PROPOSAL).to_agent(receiver)
+
+    def propose(self, receiver: AgentId) -> MessageBuilder:
+        return self.create_message_builder(consts.PROPOSE).to_agent(receiver)
+
+    def reply_with_inform(self, message: Message) -> MessageBuilder:
+        return self.create_message_builder(consts.INFORM).to_agent(message.sender)
+
+    def reply_with_accept(self, message: Message) -> MessageBuilder:
+        return self.create_message_builder(consts.ACCEPT).to_agent(message.sender)
+
+    def reply_with_refuse(self, message: Message) -> MessageBuilder:
+        return self.create_message_builder(consts.REFUSE).to_agent(message.sender)
+
+    def reply_with_acknowledge(self, message: Message) -> MessageBuilder:
+        return self.create_message_builder(consts.ACKNOWLEDGE).to_agent(message.sender)
+
+    def reply_with_failure(self, message: Message) -> MessageBuilder:
+        return self.create_message_builder(consts.FAILURE).to_agent(message.sender)
+
+
+
 
 
 class MessageHandler:
