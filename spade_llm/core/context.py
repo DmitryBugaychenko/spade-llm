@@ -10,7 +10,12 @@ from spade_llm.core.storage import PrefixKeyValueStorage, TransientKeyValueStora
 
 class AgentContextImpl(AgentContext):
 
-    def __init__(self, kv_store: KeyValueStorage, agent_type: str, agent_id: str, thread_id: Optional[UUID], message_service: MessageService,
+    def __init__(self,
+                 kv_store: KeyValueStorage,
+                 agent_type: str,
+                 agent_id: str,
+                 thread_id: Optional[UUID],
+                 message_service: MessageService,
                  tools=None):
 
         if tools is None:
