@@ -26,7 +26,7 @@ class TestGigaChat(unittest.TestCase):
 
     def test_chat(self):
         conf_yaml = '''
-            type_name: spade_llm.platform.gigachat.GigaChatModelFactory
+            type_name: spade_llm.models.gigachat.GigaChatModelFactory
             args:
               credentials: env.GIGA_CRED
               model: GigaChat-2
@@ -44,7 +44,7 @@ class TestGigaChat(unittest.TestCase):
 
     def test_embeddings(self):
         conf_yaml = '''
-                type_name: spade_llm.platform.gigachat.GigaChatEmbeddingsFactory
+                type_name: spade_llm.models.gigachat.GigaChatEmbeddingsFactory
                 args:
                   credentials: env.GIGA_CRED
                   verify_ssl_certs: False

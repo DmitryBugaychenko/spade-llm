@@ -1,10 +1,11 @@
 import uuid
-from uuid import UUID
 from typing import List, Optional
+from uuid import UUID
 
 from langchain_core.tools import BaseTool
 
 from spade_llm.core.api import KeyValueStorage, MessageService, Message, AgentContext
+from spade_llm.core.models import ModelsProvider
 from spade_llm.core.storage import PrefixKeyValueStorage, TransientKeyValueStorage
 
 
@@ -16,8 +17,8 @@ class AgentContextImpl(AgentContext):
                  agent_id: str,
                  thread_id: Optional[UUID],
                  message_service: MessageService,
-                 tools=None,
-                 model_provider=None):  # Added model_provider parameter
+                 tools: List[BaseTool] = None,
+                 model_provider: ModelsProvider=None):
 
         if tools is None:
             tools = []
@@ -25,9 +26,9 @@ class AgentContextImpl(AgentContext):
         self._agent_id = agent_id
         self._agent_type = agent_type
         self._thread_id = thread_id
-        self.message_service = message_service
-        self.tools = tools
-        self.model_provider = model_provider  # Store the model provider
+        self._message_service = message_service
+        self._tools = tools
+        self._model_provider = model_provider  # Store the model provider
         self._thread_kv_store: Optional[PrefixKeyValueStorage] = None
 
     @property
@@ -58,7 +59,9 @@ class AgentContextImpl(AgentContext):
 
     async def fork_thread(self) -> "AgentContextImpl":
         new_thread_id = uuid.uuid4()
-        new_context = AgentContextImpl(self.kv_store, self.agent_type, self.agent_id, new_thread_id, self.message_service)
+        new_context = AgentContextImpl(
+            self.kv_store, self.agent_type, self.agent_id, new_thread_id,
+            self._message_service, self._tools, self._model_provider)
         return new_context
 
     async def close_thread(self) -> "AgentContextImpl":
@@ -69,7 +72,7 @@ class AgentContextImpl(AgentContext):
         return self
 
     async def send(self, message: Message):
-        await self.message_service.post_message(message)
+        await self._message_service.post_message(message)
 
     async def get_item(self, key: str) -> str:
         return await self.kv_store.get_item(key)
@@ -82,11 +85,10 @@ class AgentContextImpl(AgentContext):
 
     @property
     def tools(self) -> List[BaseTool]:
-        return self.tools
+        return self._tools
 
-    @tools.setter
-    def tools(self, value):
-        self._tools = value
+    def create_chat_model(self, name):
+        return self._model_provider.create_chat_model(name)
 
-    def get_model(self):
-        return self.model_provider  # Return the stored model provider
+    def create_embeddings_model(self, name):
+        return self._model_provider.create_embeddings_model(name)

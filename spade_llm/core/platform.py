@@ -13,11 +13,13 @@ from spade_llm.core.api import (
     StorageFactory,
 )
 from spade_llm.core.context import AgentContextImpl
+from spade_llm.core.models import ModelsProvider
 from spade_llm.core.storage import PrefixKeyValueStorage
 
 
 class AgentPlatformImpl(AgentPlatform):
-    def __init__(self, storage_factory: StorageFactory, message_service: MessageService):
+    def __init__(self, storage_factory: StorageFactory, message_service: MessageService, model_provider: ModelsProvider):
+        self.model_provider = model_provider
         self.storage_factory = storage_factory
         self.message_service = message_service
         self.agents: Dict[str, AgentHandler] = {}
@@ -56,10 +58,11 @@ class AgentPlatformImpl(AgentPlatform):
             await handler.handle_message(context, message)
             await message_source.message_handled()
 
-    def create_context(self, handler: AgentHandler, agent_id: str, thread_id: Optional[UUID]  ):
+    def create_context(self, handler: AgentHandler, agent_id: str, thread_id: Optional[UUID]):
         kv_store = PrefixKeyValueStorage(self.storages[handler.agent_type], agent_id)
         tools = self.tools_by_agent.get(handler.agent_type, [])
-        context = AgentContextImpl(kv_store, handler.agent_type, agent_id, thread_id, self.message_service, tools=tools)
+        context = AgentContextImpl(kv_store, handler.agent_type, agent_id, thread_id,
+                                   self.message_service, tools=tools, model_provider=self.model_provider)
         return context
 
     async def shutdown(self):

@@ -1,8 +1,10 @@
+import logging
 import uuid
 from abc import ABCMeta, abstractmethod
 import asyncio
 from typing import Optional, Callable
 
+from spade_llm import consts
 from spade_llm.core.api import MessageHandler, AgentContext, Message
 
 
@@ -86,12 +88,75 @@ class MessageTemplate:
             return False
         return True
 
+    @classmethod
+    def inform(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the INFORM message type.
+        """
+        return cls(performative=consts.INFORM)
+
+    @classmethod
+    def request(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the REQUEST message type.
+        """
+        return cls(performative=consts.REQUEST)
+
+    @classmethod
+    def request_proposal(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the REQUEST_PROPOSAL message type.
+        """
+        return cls(performative=consts.REQUEST_PROPOSAL)
+
+    @classmethod
+    def propose(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the PROPOSE message type.
+        """
+        return cls(performative=consts.PROPOSE)
+
+    @classmethod
+    def accept(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the ACCEPT message type.
+        """
+        return cls(performative=consts.ACCEPT)
+
+    @classmethod
+    def refuse(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the REFUSE message type.
+        """
+        return cls(performative=consts.REFUSE)
+
+    @classmethod
+    def acknowledge(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the ACKNOWLEDGE message type.
+        """
+        return cls(performative=consts.ACKNOWLEDGE)
+
+    @classmethod
+    def failure(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the FAILURE message type.
+        """
+        return cls(performative=consts.FAILURE)
+
+
+
+
+
+
+
 class Behaviour(metaclass=ABCMeta):
     """
     Reusable code block for the agent, consumes a message matching certain template and
     handles it
     """
     _agent: BehaviorsOwner
+    _logger: logging.Logger
     _is_done: bool = False
 
     def __init__(self):
@@ -109,6 +174,10 @@ class Behaviour(metaclass=ABCMeta):
         Setup method to initialize the behavior with its associated agent.
         """
         self._agent = agent
+        if hasattr(self.agent, "agent_type"):
+            self._logger = logging.getLogger(agent.agent_type + "." + self.__class__.__name__)
+        else:
+            self._logger = logging.getLogger(self.__class__.__name__)
 
     def start(self):
         """
@@ -179,6 +248,10 @@ class Behaviour(metaclass=ABCMeta):
         except asyncio.TimeoutError:
             self.agent.remove_behaviour(receiver)
             return None
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
 
 
 class ContextBehaviour(Behaviour, metaclass=ABCMeta):

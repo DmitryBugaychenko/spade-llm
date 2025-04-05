@@ -9,7 +9,7 @@ class EchoAgentHandler(Agent, Configurable[EmptyConfig]):
 
     class EchoBehaviour(MessageHandlingBehavior):
         async def step(self):
-            await self.context.send(self.context
+            await (self.context
                               .reply_with_inform(self.message)
                               .with_content(self.message.content))
 

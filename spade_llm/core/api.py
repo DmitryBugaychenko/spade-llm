@@ -7,6 +7,7 @@ from multipledispatch import dispatch
 from pydantic import BaseModel, Field
 
 from spade_llm import consts
+from spade_llm.core.models import ModelsProvider
 
 
 class AgentId(BaseModel):
@@ -26,91 +27,18 @@ class Message(BaseModel):
     # TODO: Allow for typed content with raw nested JSON
     content: str = Field(description="Content of the message")
 
+
+class SendMessageCallback(metaclass=ABCMeta):
+    @abstractmethod
+    async def send(self, msg: Message):
+        pass
+
 class MessageBuilder:
     _message: dict[str,Any]
 
-    def __init__(self, performative: str):
+    def __init__(self, performative: str, send: SendMessageCallback):
+        self._send = send
         self._message = {consts.PERFORMATIVE : performative}
-
-    @staticmethod
-    def request() -> "MessageBuilder":
-        return MessageBuilder(consts.REQUEST)
-
-    @staticmethod
-    def request_proposal() -> "MessageBuilder":
-        return MessageBuilder(consts.REQUEST_PROPOSAL)
-
-    @staticmethod
-    def inform() -> "MessageBuilder":
-        return MessageBuilder(consts.INFORM)
-
-    @staticmethod
-    def acknowledge() -> "MessageBuilder":
-        return MessageBuilder(consts.ACKNOWLEDGE)
-
-    @staticmethod
-    def failure() -> "MessageBuilder":
-        return MessageBuilder(consts.FAILURE)
-
-    @staticmethod
-    def propose() -> "MessageBuilder":
-        return MessageBuilder(consts.PROPOSE)
-
-    @staticmethod
-    def accept() -> "MessageBuilder":
-        return MessageBuilder(consts.ACCEPT)
-
-    @staticmethod
-    def refuse() -> "MessageBuilder":
-        return MessageBuilder(consts.REFUSE)
-
-    @staticmethod
-    def reply_with_inform(msg: Message) -> "MessageBuilder":
-        return (MessageBuilder
-                .inform()
-                .to_agent(msg.sender)
-                .from_agent(msg.to)
-                .in_thread(msg.thread))
-
-    @staticmethod
-    def reply_with_ack(msg: Message) -> "MessageBuilder":
-        return (MessageBuilder
-                .acknowledge()
-                .to_agent(msg.sender)
-                .from_agent(msg.to)
-                .in_thread(msg.thread))
-
-    @staticmethod
-    def reply_with_failure(msg: Message) -> "MessageBuilder":
-        return (MessageBuilder
-                .failure()
-                .to_agent(msg.sender)
-                .from_agent(msg.to)
-                .in_thread(msg.thread))
-
-    @staticmethod
-    def reply_with_propose(msg: Message) -> "MessageBuilder":
-        return (MessageBuilder
-                .propose()
-                .to_agent(msg.sender)
-                .from_agent(msg.to)
-                .in_thread(msg.thread))
-
-    @staticmethod
-    def reply_with_accept(msg: Message) -> "MessageBuilder":
-        return (MessageBuilder
-                .accept()
-                .to_agent(msg.sender)
-                .from_agent(msg.to)
-                .in_thread(msg.thread))
-
-    @staticmethod
-    def reply_with_refuse(msg: Message) -> "MessageBuilder":
-        return (MessageBuilder
-                .refuse()
-                .to_agent(msg.sender)
-                .from_agent(msg.to)
-                .in_thread(msg.thread))
 
     def in_thread(self, thread: uuid.UUID) -> Self:
         self._message["thread_id"] = thread
@@ -124,16 +52,15 @@ class MessageBuilder:
         self._message["sender"] = from_agent
         return self
 
-
     @dispatch(str)
-    def with_content(self, body: str) -> Message:
+    async def with_content(self, body: str):
         self._message["content"] = body
-        return Message(**self._message)
+        await self._send.send(Message(**self._message))
 
     @dispatch(BaseModel)
-    def with_content(self, body: BaseModel) -> Message:
+    async def with_content(self, body: BaseModel):
         self._message["content"] = body.model_dump_json()
-        return Message(**self._message)
+        await self._send.send(Message(**self._message))
 
 class KeyValueStorage(metaclass=ABCMeta):
     @abstractmethod
@@ -237,7 +164,7 @@ class MessageService(metaclass=ABCMeta):
         """
         pass
 
-class AgentContext(KeyValueStorage, metaclass=ABCMeta):
+class AgentContext(KeyValueStorage, ModelsProvider, SendMessageCallback, metaclass=ABCMeta):
     """
     Provides information for an agent about the current context, including access to the agent's key/value
     storage, thread (conversation) context, adds ability to send messages, start and stop threads, and
@@ -323,7 +250,7 @@ class AgentContext(KeyValueStorage, metaclass=ABCMeta):
         """
         Creates a new builder for a message, initializes sender and thread
         """
-        bld = MessageBuilder(performative).from_agent(
+        bld = MessageBuilder(performative, self).from_agent(
             AgentId(agent_type = self.agent_type, agent_id = self.agent_id))
         if self.has_thread:
             return bld.in_thread(self.thread_id)

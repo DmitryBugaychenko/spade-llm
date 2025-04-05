@@ -1,0 +1,36 @@
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+chat_models:
+  giga:
+    type_name: spade_llm.models.gigachat.GigaChatModelFactory
+    args:
+      credentials: env.GIGA_CRED
+      model: GigaChat-Pro
+      verify_ssl_certs: False
+tools:
+  wikipedia:
+    type_name: spade_llm.core.tools.LangChainApiWrapperToolFactory
+    args:
+      type_name: langchain_community.tools.WikipediaQueryRun
+      api_wrapper:
+        type_name: langchain_community.utilities.WikipediaAPIWrapper
+        args:
+          top_k_results: 1
+          doc_content_chars_max: 4096
+          lang: en
+agents:
+  react:
+    type_name: spade_llm.core.react.ReactAgent
+    args:
+      system_prompt: |
+        You are a personal assistant helping with different matters.
+        Use provided tools to solve user tasks.
+      model: giga
+    tools: [wikipedia]
+  console:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: react
+wait_for_agents: [console]

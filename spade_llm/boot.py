@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 from typing import cast
 
 import yaml
@@ -18,6 +19,7 @@ class AgentConfig(ConfigurableRecord):
     agent_type: str = Field(
         default="",
         description="Type of the agent. If not explicitly set name of the agent in configuration is used.")
+    tools: set[str] = Field(default=set(), description="Tools to provide to the agent.")
 
     def _create_instance(self, cls):
         return cls(agent_type=self.agent_type)
@@ -40,13 +42,16 @@ class Boot:
     async def run(self):
         storage_factory = self.config.storage.create_factory()
         message_service = self.config.messaging.create_messaging_service()
-        platform = AgentPlatformImpl(storage_factory, message_service)
+        platform = AgentPlatformImpl(storage_factory, message_service, self.config)
         agents: dict[str,Agent] = dict()
 
         for agent_type, agent_conf in self.config.agents.items():
             agent_conf.agent_type = agent_type
             agent = agent_conf.create_agent()
-            await platform.register_agent(agent, [])
+            tools = []
+            for tool_name in agent_conf.tools:
+                tools.append(self.config.create_tool(tool_name))
+            await platform.register_agent(agent, tools)
             agents[agent_type] = agent
 
         if len(self.config.wait_for_agents) > 0:
@@ -73,6 +78,8 @@ async def main():
 
     with open(args.config_file, 'r') as f:
         raw_config = yaml.safe_load(f)
+
+    logging.basicConfig(level=logging.DEBUG)
 
     config = PlatformConfiguration(**raw_config)
     boot = Boot(config)

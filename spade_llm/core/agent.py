@@ -261,14 +261,25 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         Tries to find behavior(s) matching message and passes message to each of them. Afterward checks if behavior(s) are
         done and if so removes them.
         """
-        done_behaviors = []  # Collect behaviors marked as done
-        for matched_behavior in self._dispatcher.find_matching_behaviour(message):
-            await matched_behavior.handle_message(context, message)
-            if matched_behavior.is_done():
-                done_behaviors.append(matched_behavior)
-        for behavior in done_behaviors:
-            self.remove_behaviour(behavior)
-        self.logger.debug("Handled message: %s", message)
+        try:
+            done_behaviors = []  # Collect behaviors marked as done
+            behaviours = self._dispatcher.find_matching_behaviour(message)
+            if not behaviours:
+                self.logger.warning("No matching behavior found for %s", message)
+                return
+
+            for matched_behavior in behaviours:
+                await matched_behavior.handle_message(context, message)
+                if matched_behavior.is_done():
+                    done_behaviors.append(matched_behavior)
+            for behavior in done_behaviors:
+                self.remove_behaviour(behavior)
+            self.logger.debug("Handled message: %s", message)
+        except Exception as e:
+            self.logger.error("Error handling message '%s': %s", message, e)
+
+
+
 
     def stop(self):
         """

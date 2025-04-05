@@ -8,7 +8,7 @@ from spade_llm.core.conf import configuration, Configurable
 
 
 class ConsoleAgentConf(BaseModel):
-    prompt: str = Field(default="User input:", description="Prompt to show in console when asking for input.")
+    prompt: str = Field(default="User input: ", description="Prompt to show in console when asking for input.")
     delegate_type: str = Field(description="Type of the delegate agent to send messages to.")
     delegate_id: str = Field(default="default", description="Type of the delegate agent to send messages to.")
     stop_words: set[str] = Field(default={"exit"}, description="Stop words used to shut down the agent")
@@ -29,9 +29,9 @@ class ConsoleAgent(Agent, Configurable[ConsoleAgentConf]):
                 self.set_is_done()
             else:
                 thread = await self.context.fork_thread()
-                await self.context.send(thread
-                    .inform(AgentId(agent_type=self.config.delegate_type, agent_id=self.config.delegate_id))
-                    .with_content(user_input))
+                await (thread
+                        .request(AgentId(agent_type=self.config.delegate_type, agent_id=self.config.delegate_id))
+                        .with_content(user_input))
 
                 reply = await self.receive(MessageTemplate(thread_id=thread.thread_id), self.config.timeout)
                 if reply:
