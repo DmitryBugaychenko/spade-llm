@@ -16,7 +16,8 @@ class AgentContextImpl(AgentContext):
                  agent_id: str,
                  thread_id: Optional[UUID],
                  message_service: MessageService,
-                 tools=None):
+                 tools=None,
+                 model_provider=None):  # Added model_provider parameter
 
         if tools is None:
             tools = []
@@ -26,12 +27,12 @@ class AgentContextImpl(AgentContext):
         self._thread_id = thread_id
         self.message_service = message_service
         self.tools = tools
+        self.model_provider = model_provider  # Store the model provider
         self._thread_kv_store: Optional[PrefixKeyValueStorage] = None
 
     @property
     def agent_type(self) -> str:
         return self._agent_type
-
 
     @property
     def agent_id(self) -> str:
@@ -86,3 +87,6 @@ class AgentContextImpl(AgentContext):
     @tools.setter
     def tools(self, value):
         self._tools = value
+
+    def get_model(self):
+        return self.model_provider  # Return the stored model provider
