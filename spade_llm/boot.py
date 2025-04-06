@@ -12,7 +12,7 @@ from spade_llm.core.messaging import MessageServiceConfig
 from spade_llm.core.models import ModelsProviderConfig
 from spade_llm.core.platform import AgentPlatformImpl
 from spade_llm.core.storage import StorageFactoryConfig
-from spade_llm.core.tools import ToolProviderConfig
+from spade_llm.core.tools import ToolProviderConfig, DelegateToolConfig
 
 
 class AgentConfig(ConfigurableRecord):
@@ -20,6 +20,8 @@ class AgentConfig(ConfigurableRecord):
         default="",
         description="Type of the agent. If not explicitly set name of the agent in configuration is used.")
     tools: set[str] = Field(default=set(), description="Tools to provide to the agent.")
+    contacts: list[DelegateToolConfig] = Field(
+        default=[], description="Contacts of the agents to delegate tasks to.")
 
     def _create_instance(self, cls):
         return cls(agent_type=self.agent_type)
@@ -51,7 +53,7 @@ class Boot:
             tools = []
             for tool_name in agent_conf.tools:
                 tools.append(self.config.create_tool(tool_name))
-            await platform.register_agent(agent, tools)
+            await platform.register_agent(agent, tools, agent_conf.contacts)
             agents[agent_type] = agent
 
         if len(self.config.wait_for_agents) > 0:
@@ -79,7 +81,7 @@ async def main():
     with open(args.config_file, 'r') as f:
         raw_config = yaml.safe_load(f)
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     config = PlatformConfiguration(**raw_config)
     boot = Boot(config)

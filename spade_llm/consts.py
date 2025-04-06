@@ -1,10 +1,9 @@
-from re import template
-
 from spade.template import Template
 
 PERFORMATIVE = "performative"
 REQUEST = "request"
 REQUEST_PROPOSAL = "request_proposal"
+REQUEST_APPROVAL = "request_approval"
 INFORM = "inform"
 PROPOSE = "propose"
 ACCEPT = "accept"

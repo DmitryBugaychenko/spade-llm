@@ -10,7 +10,7 @@ from spade_llm.core.api import (
     KeyValueStorage,
     MessageService,
     MessageSource,
-    StorageFactory,
+    StorageFactory, LocalToolFactory,
 )
 from spade_llm.core.context import AgentContextImpl
 from spade_llm.core.models import ModelsProvider
@@ -25,10 +25,11 @@ class AgentPlatformImpl(AgentPlatform):
         self.agents: Dict[str, AgentHandler] = {}
         self.storages: Dict[str, KeyValueStorage] = {}
         self.tools_by_agent: Dict[str, List[BaseTool]] = {}
+        self.local_tools_by_agent: Dict[str, List[LocalToolFactory]] = {}
         self.run_loop_tasks: Dict[str, asyncio.Task] = {}
         self.message_sources: Dict[str, MessageSource] = {}  # New dictionary to hold message sources
 
-    async def register_agent(self, agent: AgentHandler, tools: List[BaseTool]):
+    async def register_agent(self, agent: AgentHandler, tools: List[BaseTool], contacts: list[LocalToolFactory]):
         agent_type = agent.agent_type
         if agent_type in self.agents:
             raise ValueError(f"An agent with type '{agent_type}' is already registered.")
@@ -36,6 +37,7 @@ class AgentPlatformImpl(AgentPlatform):
         self.agents[agent_type] = agent
         self.storages[agent_type] = await self.storage_factory.create_storage(agent_type)
         self.tools_by_agent[agent_type] = tools
+        self.local_tools_by_agent[agent_type] = contacts
 
         # Create and store the message source
         message_source = await self.message_service.get_or_create_source(agent_type)
@@ -61,8 +63,12 @@ class AgentPlatformImpl(AgentPlatform):
     def create_context(self, handler: AgentHandler, agent_id: str, thread_id: Optional[UUID]):
         kv_store = PrefixKeyValueStorage(self.storages[handler.agent_type], agent_id)
         tools = self.tools_by_agent.get(handler.agent_type, [])
+        local_tools = self.local_tools_by_agent.get(handler.agent_type, [])
         context = AgentContextImpl(kv_store, handler.agent_type, agent_id, thread_id,
-                                   self.message_service, tools=tools, model_provider=self.model_provider)
+                                   self.message_service,
+                                   tools=tools,
+                                   local_tools=local_tools,
+                                   model_provider=self.model_provider)
         return context
 
     async def shutdown(self):

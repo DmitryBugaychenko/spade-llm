@@ -110,6 +110,13 @@ class MessageTemplate:
         return cls(performative=consts.REQUEST_PROPOSAL)
 
     @classmethod
+    def request_approval(cls) -> "MessageTemplate":
+        """
+        Returns a MessageTemplate for the REQUEST_APPROVAL message type.
+        """
+        return cls(performative=consts.REQUEST_APPROVAL)
+
+    @classmethod
     def propose(cls) -> "MessageTemplate":
         """
         Returns a MessageTemplate for the PROPOSE message type.
@@ -144,10 +151,11 @@ class MessageTemplate:
         """
         return cls(performative=consts.FAILURE)
 
-
-
-
-
+    @staticmethod
+    def from_agent(agent_type: str) -> Callable[[Message], bool]:
+        def validator(msg: Message) -> bool:
+            return msg.sender.agent_type == agent_type
+        return validator
 
 
 class Behaviour(metaclass=ABCMeta):

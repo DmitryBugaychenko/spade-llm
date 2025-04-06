@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 from spade_llm.core.agent import Agent
 from spade_llm.core.api import AgentId, AgentContext
-from spade_llm.core.behaviors import ContextBehaviour, MessageTemplate
+from spade_llm.core.behaviors import ContextBehaviour, MessageTemplate, MessageHandlingBehavior
 from spade_llm.core.conf import configuration, Configurable
 
 
@@ -41,6 +41,17 @@ class ConsoleAgent(Agent, Configurable[ConsoleAgentConf]):
 
                 await thread.close()
 
+    class ApproveAction(MessageHandlingBehavior):
+
+        async def step(self):
+            action = self.message.content
+            response = await ainput(f"Do you want to approve the action '{action}'? [y/n] ")
+            if response.lower() == "y":
+                await (self.context.reply_with_acknowledge(self.message).with_content(""))
+            else:
+                await (self.context.reply_with_refuse(self.message).with_content(""))
+
 
     def setup(self):
         self.add_behaviour(self.InputBehavior(self.default_context, self.config))
+        self.add_behaviour(self.ApproveAction(MessageTemplate.request_approval()))

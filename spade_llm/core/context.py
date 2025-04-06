@@ -4,7 +4,8 @@ from uuid import UUID
 
 from langchain_core.tools import BaseTool
 
-from spade_llm.core.api import KeyValueStorage, MessageService, Message, AgentContext
+from spade_llm.core.api import KeyValueStorage, MessageService, Message, AgentContext, LocalToolFactory
+from spade_llm.core.behaviors import BehaviorsOwner
 from spade_llm.core.models import ModelsProvider
 from spade_llm.core.storage import PrefixKeyValueStorage, TransientKeyValueStorage
 
@@ -18,16 +19,16 @@ class AgentContextImpl(AgentContext):
                  thread_id: Optional[UUID],
                  message_service: MessageService,
                  tools: List[BaseTool] = None,
+                 local_tools: List[LocalToolFactory] = None,
                  model_provider: ModelsProvider=None):
 
-        if tools is None:
-            tools = []
         self.kv_store = kv_store
         self._agent_id = agent_id
         self._agent_type = agent_type
         self._thread_id = thread_id
         self._message_service = message_service
-        self._tools = tools
+        self._tools = tools or []
+        self._local_tools = local_tools or []
         self._model_provider = model_provider  # Store the model provider
         self._thread_kv_store: Optional[PrefixKeyValueStorage] = None
 
@@ -83,9 +84,8 @@ class AgentContextImpl(AgentContext):
     async def close(self):
         await self.kv_store.close()
 
-    @property
-    def tools(self) -> List[BaseTool]:
-        return self._tools
+    def get_tools(self, agent: BehaviorsOwner) -> List[BaseTool]:
+        return self._tools + [tool.create_tool(agent, self) for tool in self._local_tools]
 
     def create_chat_model(self, name):
         return self._model_provider.create_chat_model(name)

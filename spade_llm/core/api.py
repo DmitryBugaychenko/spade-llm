@@ -28,7 +28,12 @@ class Message(BaseModel):
     content: str = Field(description="Content of the message")
 
 
-class SendMessageCallback(metaclass=ABCMeta):
+class MessageSender(metaclass=ABCMeta):
+    @property
+    @abstractmethod
+    def agent_id(self) -> str:
+        pass
+
     @abstractmethod
     async def send(self, msg: Message):
         pass
@@ -36,14 +41,22 @@ class SendMessageCallback(metaclass=ABCMeta):
 class MessageBuilder:
     _message: dict[str,Any]
 
-    def __init__(self, performative: str, send: SendMessageCallback):
-        self._send = send
+    def __init__(self, performative: str, sender: MessageSender):
+        self._sender = sender
         self._message = {consts.PERFORMATIVE : performative}
 
     def in_thread(self, thread: uuid.UUID) -> Self:
         self._message["thread_id"] = thread
         return self
 
+    @dispatch(str)
+    def to_agent(self, agent_type: str) -> Self:
+        self._message["receiver"] = AgentId(
+            agent_type=agent_type,
+            agent_id=self._sender.agent_id)
+        return self
+
+    @dispatch(AgentId)
     def to_agent(self, to_agent: AgentId) -> Self:
         self._message["receiver"] = to_agent
         return self
@@ -55,12 +68,12 @@ class MessageBuilder:
     @dispatch(str)
     async def with_content(self, body: str):
         self._message["content"] = body
-        await self._send.send(Message(**self._message))
+        await self._sender.send(Message(**self._message))
 
     @dispatch(BaseModel)
     async def with_content(self, body: BaseModel):
         self._message["content"] = body.model_dump_json()
-        await self._send.send(Message(**self._message))
+        await self._sender.send(Message(**self._message))
 
 class KeyValueStorage(metaclass=ABCMeta):
     @abstractmethod
@@ -164,7 +177,7 @@ class MessageService(metaclass=ABCMeta):
         """
         pass
 
-class AgentContext(KeyValueStorage, ModelsProvider, SendMessageCallback, metaclass=ABCMeta):
+class AgentContext(KeyValueStorage, ModelsProvider, MessageSender, metaclass=ABCMeta):
     """
     Provides information for an agent about the current context, including access to the agent's key/value
     storage, thread (conversation) context, adds ability to send messages, start and stop threads, and
@@ -236,9 +249,8 @@ class AgentContext(KeyValueStorage, ModelsProvider, SendMessageCallback, metacla
         """
         pass
 
-    @property
     @abstractmethod
-    def tools(self) -> list[BaseTool]:
+    def get_tools(self, agent: "BehaviorsOwner") -> list[BaseTool]:
         """
         Returns a list of tools available for the agent in the current context. These tools are
         already bound to the context, meaning that invoke is traced and context-related parameters
@@ -257,16 +269,44 @@ class AgentContext(KeyValueStorage, ModelsProvider, SendMessageCallback, metacla
         else:
             return bld
 
+    @dispatch(AgentId)
     def inform(self, receiver: AgentId) -> MessageBuilder:
         return self.create_message_builder(consts.INFORM).to_agent(receiver)
 
+    @dispatch(str)
+    def inform(self, receiver: str) -> MessageBuilder:
+        return self.create_message_builder(consts.INFORM).to_agent(receiver)
+
+    @dispatch(AgentId)
     def request(self, receiver: AgentId) -> MessageBuilder:
         return self.create_message_builder(consts.REQUEST).to_agent(receiver)
 
+    @dispatch(str)
+    def request(self, receiver: str) -> MessageBuilder:
+        return self.create_message_builder(consts.REQUEST).to_agent(receiver)
+
+    @dispatch(AgentId)
     def request_proposal(self, receiver: AgentId) -> MessageBuilder:
         return self.create_message_builder(consts.REQUEST_PROPOSAL).to_agent(receiver)
 
+    @dispatch(str)
+    def request_proposal(self, receiver: str) -> MessageBuilder:
+        return self.create_message_builder(consts.REQUEST_PROPOSAL).to_agent(receiver)
+
+    @dispatch(AgentId)
+    def request_approval(self, receiver: AgentId) -> MessageBuilder:
+        return self.create_message_builder(consts.REQUEST_APPROVAL).to_agent(receiver)
+
+    @dispatch(str)
+    def request_approval(self, receiver: str) -> MessageBuilder:
+        return self.create_message_builder(consts.REQUEST_APPROVAL).to_agent(receiver)
+
+    @dispatch(AgentId)
     def propose(self, receiver: AgentId) -> MessageBuilder:
+        return self.create_message_builder(consts.PROPOSE).to_agent(receiver)
+
+    @dispatch(str)
+    def propose(self, receiver: str) -> MessageBuilder:
         return self.create_message_builder(consts.PROPOSE).to_agent(receiver)
 
     def reply_with_inform(self, message: Message) -> MessageBuilder:
@@ -342,15 +382,25 @@ class AgentHandler(MessageHandler, metaclass=ABCMeta):
         await self.join()
 
 
+class LocalToolFactory(metaclass=ABCMeta):
+    """
+    Allows creating a local tool instance bound to the current agent context
+    """
+    def create_tool(self, agent: "BehaviorsOwner", context: AgentContext) -> BaseTool:
+        """
+        Creates a new instance of a tool attached to a particular context.
+        """
+
 class AgentPlatform(metaclass=ABCMeta):
     """
     Abstraction of an agent platform. Allows adding agents with their handlers and accessible tools.
     """
     @abstractmethod
-    async def register_agent(self, handler: AgentHandler, tools: list[BaseTool]):
+    async def register_agent(self, handler: AgentHandler, tools: list[BaseTool], local_tools: list[LocalToolFactory]):
         """
         Adds a new agent to the platform.
         :param handler: Message handler for the agent.
         :param tools: Tools available for the agent.
+        :param local_tools: Local tool factories used to create context-aware tools
         """
         pass

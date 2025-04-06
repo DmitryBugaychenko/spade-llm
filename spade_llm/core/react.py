@@ -33,14 +33,16 @@ class ReactBehaviour(MessageHandlingBehavior):
             return
 
         self.logger.debug("Handling message %s", self.message)
-        model = self.model.bind_tools(self.context.tools)
-        tools_dict = {tool.name: tool for tool in self.context.tools}
+        tools = self.context.get_tools(self.agent)
+
+
+        model = self.model.bind_tools(tools)
+        tools_dict = {tool.name: tool for tool in tools}
 
         answers = []
         user_message = HumanMessage(self.message.content)
 
         for _ in range(self.max_iterations):
-            self.logger.debug("Sending user message %s", user_message)
             answer = await model.ainvoke(
                 self.initial_message + [user_message] + answers)
             self.logger.debug("Got answer %s", answer)

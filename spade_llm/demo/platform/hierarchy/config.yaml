@@ -1,0 +1,67 @@
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+chat_models:
+  giga:
+    type_name: spade_llm.models.gigachat.GigaChatModelFactory
+    args:
+      credentials: env.GIGA_CRED
+      model: GigaChat-Pro
+      verify_ssl_certs: False
+tools:
+  wikipedia:
+    type_name: spade_llm.core.tools.LangChainApiWrapperToolFactory
+    args:
+      type_name: langchain_community.tools.WikipediaQueryRun
+      api_wrapper:
+        type_name: langchain_community.utilities.WikipediaAPIWrapper
+        args:
+          top_k_results: 1
+          doc_content_chars_max: 4096
+          lang: en
+agents:
+  payments:
+    type_name: spade_llm.demo.platform.hierarchy.agents.PaymentsAgent
+    args:
+      balance: 10000
+  savings:
+    type_name: spade_llm.demo.platform.hierarchy.agents.PaymentsAgent
+    args:
+      balance: 100000
+  financial_assistant:
+    type_name: spade_llm.core.react.ReactAgent
+    args:
+      system_prompt: |
+        You are a financial assistant helping users with their finances. Use
+        provided tools to perform payments, access savings, and manage other financial matters.
+      model: giga
+    contacts:
+      - agent_type: payments
+        description: |
+          This is a payments agent capable of handling payments from current account.
+        args_schema:
+          type_name: spade_llm.demo.platform.hierarchy.agents.FinancialMessage
+      - agent_type: savings
+        description: |
+          This is agent manage savings, it can replenish current account if needed.
+        args_schema:
+          type_name: spade_llm.demo.platform.hierarchy.agents.FinancialMessage
+  assistant:
+    type_name: spade_llm.core.react.ReactAgent
+    args:
+      system_prompt: |
+        You are a personal assistant helping with different matters.
+        Use provided tools to solve user tasks.
+      model: giga
+    tools: [wikipedia]
+    contacts:
+      - agent_type: financial_assistant
+        description: |
+          This is a financial assistant capable of handling tasks related to finance.
+          For example, it can pay bills and access client savings.
+  user:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: financial_assistant
+wait_for_agents: [user]
