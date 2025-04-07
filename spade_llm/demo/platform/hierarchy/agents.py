@@ -10,7 +10,7 @@ class FinancialAgentConf(BaseModel):
     balance: int = Field(description="Initial balance of the agent.")
 
 class FinancialMessage(BaseModel):
-    amount: int = Field(description="Amount of the payment.")
+    amount: int = Field(description="Amount of the payment. This field is required and cannot be 0")
 
 @configuration(FinancialAgentConf)
 class PaymentsAgent(Agent, Configurable[FinancialAgentConf]):

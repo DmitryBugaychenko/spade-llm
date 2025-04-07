@@ -3,11 +3,17 @@ messaging:
 storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
 chat_models:
-  giga:
+  max:
     type_name: spade_llm.models.gigachat.GigaChatModelFactory
     args:
       credentials: env.GIGA_CRED
-      model: GigaChat-Pro
+      model: GigaChat-2-Max
+      verify_ssl_certs: False
+  lite:
+    type_name: spade_llm.models.gigachat.GigaChatModelFactory
+    args:
+      credentials: env.GIGA_CRED
+      model: GigaChat-2
       verify_ssl_certs: False
 tools:
   wikipedia:
@@ -35,7 +41,8 @@ agents:
       system_prompt: |
         You are a financial assistant helping users with their finances. Use
         provided tools to perform payments, access savings, and manage other financial matters.
-      model: giga
+        Your are working with money - if your are not sure about amount, better ask client for clarification.
+      model: max
     contacts:
       - agent_type: payments
         description: |
@@ -47,13 +54,17 @@ agents:
           This is agent manage savings, it can replenish current account if needed.
         args_schema:
           type_name: spade_llm.demo.platform.hierarchy.agents.FinancialMessage
+      - agent_type: user
+        description: |
+          Use this contact to get information from the client himself. If your are not sure about amount, 
+          better ask client for clarification.
   assistant:
     type_name: spade_llm.core.react.ReactAgent
     args:
       system_prompt: |
         You are a personal assistant helping with different matters.
         Use provided tools to solve user tasks.
-      model: giga
+      model: lite
     tools: [wikipedia]
     contacts:
       - agent_type: financial_assistant
