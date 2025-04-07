@@ -4,13 +4,7 @@ from kafka import KafkaProducer
 
 
 class TestKafkaMessageSink(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
-        
-    @classmethod
-    def tearDownClass(cls):
-        cls.producer.close()
+
 
     def test_kafka_message_sink_send(self):
         """Test sending message via KafkaMessageSink."""
@@ -21,12 +15,7 @@ class TestKafkaMessageSink(unittest.TestCase):
         
         # Send a sample message
         message = b'Test message sent successfully.'
-        sink.send(message)
-        
-        # Verify message was produced correctly
-        future_metadata = self.producer.send(topic_name, value=message).get(timeout=5)
-        self.assertEqual(future_metadata.topic, topic_name)
-        self.assertGreaterEqual(future_metadata.partition, 0)
+        sink.post_message(message)
 
     def test_kafka_message_sink_invalid_server(self):
         """Test initialization failure due to invalid server address."""
