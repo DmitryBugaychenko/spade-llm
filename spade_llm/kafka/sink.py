@@ -56,5 +56,9 @@ class KafkaMessageSink(MessageSink, EventLoopThread, Configurable[KafkaProducerC
     def close(self):
         logger.info("Closing Kafka producer...")
         self.stop()
+        self.join_sync()
         self._producer.flush()
         logger.info("Kafka producer closed.")
+
+    def start(self):
+        EventLoopThread.start(self)

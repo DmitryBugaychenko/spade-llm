@@ -80,6 +80,8 @@ class AgentPlatformImpl(AgentPlatform):
         for message_source in self.message_sources.values():
             await message_source.join()
 
+        await self.message_service.shutdown()
+
         # Cancel all run loop tasks
         for task in self.run_loop_tasks.values():
             task.cancel()

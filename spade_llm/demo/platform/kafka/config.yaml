@@ -1,0 +1,30 @@
+messaging:
+  type_name: spade_llm.core.messaging.ExposedMessageSource
+  args:
+    system_name: test_system
+    internal:
+      type_name: spade_llm.core.messaging.DictionaryMessageService
+    bridge:
+      type_name: spade_llm.kafka.source.KafkaMessageSource
+      args:
+        bootstrap_servers: localhost:9092
+        group_id: test_client
+    exposed_agents: [console, echo]
+    external_systems:
+      test_system:
+        type_name: spade_llm.kafka.sink.KafkaMessageSink
+        args:
+          bootstrap_servers: localhost:9092
+          client_id: test_client
+          linger_ms: 0
+
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+agents:
+  echo:
+    type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+  console:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: echo@test_system
+wait_for_agents: [console]

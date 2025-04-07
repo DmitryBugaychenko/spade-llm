@@ -56,6 +56,8 @@ class Boot:
             await platform.register_agent(agent, tools, agent_conf.contacts)
             agents[agent_type] = agent
 
+        await message_service.start_bridges()
+
         if len(self.config.wait_for_agents) > 0:
             await self.wait_for_agents([agents[a] for a in self.config.wait_for_agents])
             for agent_type, agent in agents.items():

@@ -1,23 +1,21 @@
-import threading
 import logging
+import threading
 
 from aiologic import Event
 from confluent_kafka import Consumer
 from pydantic import Field
 
-from spade_llm.core.api import MessageSink, Message
+from spade_llm.core.api import MessageSink, Message, MessageBridge
 from spade_llm.core.conf import configuration, Configurable
 from spade_llm.kafka.sink import KafkaConfig
 
 logger = logging.getLogger(__name__)
 
+
 class KafkaConsumerConfig(KafkaConfig, extra="allow"):
     group_id: str = Field(
         serialization_alias="group.id",
         description="Kafka consumer group ID"
-    )
-    exposed_agents: list[str] = Field(
-        description="List of agents to listen for messages for"
     )
     agent_to_topic_mapping: dict[str, str] = Field(
         default={},
@@ -25,8 +23,9 @@ class KafkaConsumerConfig(KafkaConfig, extra="allow"):
     )
 
 
+
 @configuration(KafkaConsumerConfig)
-class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
+class KafkaMessageSource(Configurable[KafkaConsumerConfig], MessageBridge):
     _consumer: Consumer
     _running: bool = False
     _thread: threading.Thread
@@ -40,10 +39,10 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
         self._is_done = Event()
         self._is_started = Event()
 
-    async def start(self, sink: MessageSink):
+    async def start(self, sink: MessageSink, exposed_agents: set[str]):
         logger.info("Starting KafkaMessageSource")
         self._running = True
-        self._thread = threading.Thread(target=self.consume_messages, args=(sink,))
+        self._thread = threading.Thread(target=self.consume_messages, args=(sink,exposed_agents,))
         self._thread.start()
         await self._is_started
 
@@ -51,9 +50,9 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
         logger.info("Kafka partitions assigned: %s", partitions)
         self._is_started.set()
 
-    def consume_messages(self, sink: MessageSink):
+    def consume_messages(self, sink: MessageSink, exposed_agents: set[str]):
         try:
-            topics = [self.config.agent_to_topic_mapping.get(agent, agent) for agent in self.config.exposed_agents]
+            topics = [self.config.agent_to_topic_mapping.get(agent, agent) for agent in exposed_agents]
             logger.info("Subscribing to topics %s", topics)
             self._consumer.subscribe(topics, on_assign=self.assignment_callback)
 
@@ -63,7 +62,7 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
                 if msg is None:
                     continue
                 elif msg.error():
-                    logger.warning("Kafka error", exc_info=msg.error())
+                    logger.warning("Kafka error %s", msg.error())
                 else:
                     logger.debug("Received message %s", msg.value().decode())
                     try:
@@ -82,9 +81,6 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
     def stop(self):
         logger.info("Stop requested for KafkaMessageSource")
         self._running = False
-
-    async def await_start(self):
-        await self._is_started
 
     async def join(self):
         await self._is_done

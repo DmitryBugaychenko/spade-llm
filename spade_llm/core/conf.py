@@ -100,8 +100,8 @@ class ConfigurableRecord(BaseModel):
         cls = self._get_class()
 
         # Ensure the class is derived from Configurable
-        # if not issubclass(cls, Configurable):
-        #     raise TypeError(f"Class '{cls.__name__}' must inherit from 'Configurable'.")
+        if not issubclass(cls, Configurable):
+            raise TypeError(f"Class '{cls.__name__}' must inherit from 'Configurable'.")
 
         # Verify that the class has a 'parse_config' class method
         if not hasattr(cls, 'parse_config') or not callable(getattr(cls, 'parse_config')):

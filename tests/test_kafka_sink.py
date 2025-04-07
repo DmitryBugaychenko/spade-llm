@@ -51,10 +51,9 @@ class TestKafkaMessageSink(unittest.TestCase):
             # Initialize KafkaMessageSource with mocked sink
             source: KafkaMessageSource = KafkaMessageSource()._configure(KafkaConsumerConfig(
                 bootstrap_servers='localhost:9092',
-                group_id='test_client',
-                exposed_agents=['receiver']))
+                group_id='test_client'))
 
-            await source.start(mock_sink)
+            await source.start(mock_sink,{"receiver"})
 
             try:
                 # Post the message through the sink

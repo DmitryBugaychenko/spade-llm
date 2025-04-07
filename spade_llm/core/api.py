@@ -130,6 +130,12 @@ class MessageSink(metaclass=ABCMeta):
         """
         pass
 
+    def start(self):
+        pass
+
+    def close(self):
+        pass
+
 class MessageSource(MessageSink, metaclass=ABCMeta):
     """
     Allows agents to asynchronously fetch messages for certain agent type.
@@ -173,7 +179,26 @@ class MessageSource(MessageSink, metaclass=ABCMeta):
         """
         pass
 
+class MessageBridge(metaclass=ABCMeta):
+    """
+    Used to bridge messages from external sources to internal message queues.
+    """
+    @abstractmethod
+    async def start(self, sink: MessageSink, exposed_agents: set[str]):
+        """
+        Starts bridging messages from external sources to provided sink.
+        :param sink: Sink to post messages to.
+        :param exposed_agents: Set of agents to receive messages for.
+        """
+        pass
 
+    @abstractmethod
+    def stop(self):
+        pass
+
+    @abstractmethod
+    async def join(self):
+        pass
 
 class MessageService(MessageSink, metaclass=ABCMeta):
     """
@@ -187,6 +212,18 @@ class MessageService(MessageSink, metaclass=ABCMeta):
         :return: Message source to consume messages from.
         """
         pass
+
+    async def start_bridges(self):
+        """
+        Starts all the bridges registered for this service.
+        """
+
+
+    async def shutdown(self):
+        """
+        Shutdowns the message service and wait for completion.
+        """
+
 
 class AgentContext(KeyValueStorage, ModelsProvider, MessageSender, metaclass=ABCMeta):
     """

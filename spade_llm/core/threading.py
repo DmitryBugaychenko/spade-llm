@@ -58,5 +58,8 @@ class EventLoopThread:
     def stop(self):
         self.loop.call_soon_threadsafe(self._is_stopped.set)
 
+    def join_sync(self):
+        self._thread.join()
+
     async def join(self):
         await self._is_completed
