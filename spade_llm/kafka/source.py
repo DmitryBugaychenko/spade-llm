@@ -1,5 +1,6 @@
 from confluent_kafka import Consumer
 from pydantic import Field
+from aiolog import Event
 
 from spade_llm.core.api import MessageSink
 from spade_llm.core.conf import configuration, Configurable
@@ -28,9 +29,11 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
     _consumer: Consumer
     _running: bool = False
     _thread: threading.Thread
+    _event: Event
 
     def configure(self):
         self._consumer = Consumer(self.config.model_dump(by_alias=True, exclude=["agent_to_topic_mapping"]))
+        self._event = Event()
 
     def start(self, sink: MessageSink):
         self._running = True
@@ -52,10 +55,10 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
                     sink.process_message(msg.value())
         finally:
             self._consumer.close()
+            self._event.set()
 
     def stop(self):
         self._running = False
 
     async def join(self):
-        if hasattr(self, '_thread') and self._thread.is_alive():
-            await asyncio.to_thread(self._thread.join)
+        await self._event.wait()
