@@ -6,6 +6,7 @@ from spade_llm.core.conf import configuration, Configurable
 from spade_llm.core.threading import EventLoopThread
 from spade_llm.kafka.sink import KafkaConfig
 import threading
+import asyncio
 
 
 class KafkaConsumerConfig(KafkaConfig, extra="allow"):
@@ -55,6 +56,6 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
     def stop(self):
         self._running = False
 
-    def join(self):
+    async def join(self):
         if hasattr(self, '_thread') and self._thread.is_alive():
-            self._thread.join()
+            await asyncio.to_thread(self._thread.join)
