@@ -113,7 +113,24 @@ class StorageFactory(metaclass=ABCMeta):
         """
         pass
 
-class MessageSource(metaclass=ABCMeta):
+class MessageSink(metaclass=ABCMeta):
+    @abstractmethod
+    async def post_message(self, msg: Message):
+        """
+        Posts a new message into one of the registered message sources.
+        :param msg: Message to put.
+        """
+        pass
+
+    @abstractmethod
+    def post_message_sync(self, msg: Message):
+        """
+        Posts a new message into one of the registered message sources in synchronous mode.
+        :param msg: Message to put.
+        """
+        pass
+
+class MessageSource(MessageSink, metaclass=ABCMeta):
     """
     Allows agents to asynchronously fetch messages for certain agent type.
     """
@@ -157,15 +174,6 @@ class MessageSource(metaclass=ABCMeta):
         pass
 
 
-class MessageSink(metaclass=ABCMeta):
-    @abstractmethod
-    async def post_message(self, msg: Message):
-        """
-        Posts a new message into one of the registered message sources.
-        :param msg: Message to put.
-        """
-        pass
-
 
 class MessageService(MessageSink, metaclass=ABCMeta):
     """
@@ -177,14 +185,6 @@ class MessageService(MessageSink, metaclass=ABCMeta):
         Creates or returns previously created message source for agent type.
         :param agent_type: Agent type to get messages for.
         :return: Message source to consume messages from.
-        """
-        pass
-
-    @abstractmethod
-    async def post_message(self, msg: Message):
-        """
-        Posts a new message into one of the registered message sources.
-        :param msg: Message to put.
         """
         pass
 

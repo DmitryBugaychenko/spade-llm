@@ -1,14 +1,29 @@
-import unittest
 import asyncio
-from unittest.mock import MagicMock
-from spade_llm.core.api import Message, AgentId  
-from spade_llm.kafka.sink import KafkaMessageSink, KafkaProducerConfig  
+import logging
+import unittest
+from typing import Optional
+
+import aiologic
+
+from spade_llm.core.api import Message, AgentId, MessageSink
+from spade_llm.kafka.sink import KafkaMessageSink, KafkaProducerConfig
 from spade_llm.kafka.source import KafkaMessageSource, KafkaConsumerConfig
 
 
+class SingleMessageSink(MessageSink):
+    def post_message_sync(self, msg: Message):
+        self.msg = msg
+        self.event.set()
+
+    msg: Optional[Message]
+    event = aiologic.Event()
+    async def post_message(self, msg: Message):
+        self.post_message_sync(msg)
+
 class TestKafkaMessageSink(unittest.TestCase):
-    
+
     def test_kafka_message_sink_send(self):
+        logging.basicConfig(level=logging.DEBUG)
         """Test sending message via KafkaMessageSink."""
         asyncio.run(self._run_async_test())
 
@@ -21,39 +36,43 @@ class TestKafkaMessageSink(unittest.TestCase):
         sink: KafkaMessageSink = KafkaMessageSink()._configure(KafkaProducerConfig(
             bootstrap_servers='localhost:9092',
             client_id='test_client',
-            linger_ms=100))
+            linger_ms=0))
 
         sink.start()
 
-        # Prepare a sample Message object
-        message = Message(sender=sender, receiver=receiver, performative="inform", content="Test message sent successfully.")
+        try:
 
-        # Mock MessageSink to verify if the message was received
-        mock_sink = MagicMock(spec=Message)
+            # Prepare a sample Message object
+            message = Message(sender=sender, receiver=receiver, performative="inform", content="Test message sent successfully.")
 
-        # Initialize KafkaMessageSource with mocked sink
-        source: KafkaMessageSource = KafkaMessageSource()._configure(KafkaConsumerConfig(
-            bootstrap_servers='localhost:9092',
-            group_id='test_client',
-            exposed_agents=['receiver'],
-            message_sink=mock_sink))  # Pass the mock sink here
+            # Mock MessageSink to verify if the message was received
+            mock_sink = SingleMessageSink()
 
-        source.start()
+            # Initialize KafkaMessageSource with mocked sink
+            source: KafkaMessageSource = KafkaMessageSource()._configure(KafkaConsumerConfig(
+                bootstrap_servers='localhost:9092',
+                group_id='test_client',
+                exposed_agents=['receiver']))
 
-        # Post the message through the sink
-        await sink.post_message(message)
+            await source.start(mock_sink)
 
-        # Wait for the message to propagate
-        await asyncio.sleep(1)
+            try:
+                # Post the message through the sink
+                await sink.post_message(message)
 
-        # Verify that the mock sink received the message
-        mock_sink.assert_called_once_with(message)
+                # Wait for the message to propagate
+                mock_sink.event.wait(timeout=60)
 
-        # Clean up resources
-        sink.close()
-        await sink.join()
-        source.stop()
-        await source.join()
+                # Verify that the mock sink received the message
+                self.assertEqual(mock_sink.msg, message)
+            finally:
+                source.stop()
+                await source.join()
+        finally:
+            # Clean up resources
+            sink.close()
+            await sink.join()
+
 
 if __name__ == "__main__":
     unittest.main()
