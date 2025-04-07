@@ -1,7 +1,7 @@
 import unittest
-from spade_llm.kafka.sink import KafkaMessageSink  # Assuming sink module exists
-from kafka import KafkaProducer
+
 from spade_llm.core.api import Message, AgentId  # Import Message and AgentId classes
+from spade_llm.kafka.sink import KafkaMessageSink, KafkaProducerConfig  # Assuming sink module exists
 
 
 class TestKafkaMessageSink(unittest.TestCase):
@@ -9,15 +9,17 @@ class TestKafkaMessageSink(unittest.TestCase):
     def test_kafka_message_sink_send(self):
         """Test sending message via KafkaMessageSink."""
         # Define the agent type for the topic name
-        receiver = AgentId("receiver", "type")
-        topic_name = f"{receiver.agent_type}_messages"
+        receiver = AgentId(agent_type="receiver", agent_id="1235")
+        sender = AgentId(agent_type="sender", agent_id="12356")
 
         # Initialize KafkaMessageSink instance
-        sink = KafkaMessageSink(topic_name, bootstrap_servers=['localhost:9092'])
+        sink = KafkaMessageSink(KafkaProducerConfig(
+            bootstrap_servers='localhost:9092',
+            client_id='test_client',
+            linger_ms=100))
 
         # Prepare a sample Message object
-        message_content = {"content": "Test message sent successfully."}
-        message = Message(sender="sender_id", receiver="receiver_id", body=message_content)
+        message = Message(sender=sender, receiver=receiver, performative="inform", content="Test message sent successfully.")
 
         # Post the message through the sink
         sink.post_message(message)
