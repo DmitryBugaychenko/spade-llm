@@ -156,7 +156,18 @@ class MessageSource(metaclass=ABCMeta):
         """
         pass
 
-class MessageService(metaclass=ABCMeta):
+
+class MessageSink(metaclass=ABCMeta):
+    @abstractmethod
+    async def post_message(self, msg: Message):
+        """
+        Posts a new message into one of the registered message sources.
+        :param msg: Message to put.
+        """
+        pass
+
+
+class MessageService(MessageSink, metaclass=ABCMeta):
     """
     Allows agents to connect to the message sources and to send messages.
     """

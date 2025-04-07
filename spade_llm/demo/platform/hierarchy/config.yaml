@@ -26,7 +26,7 @@ agents:
     args:
       balance: 10000
   savings:
-    type_name: spade_llm.demo.platform.hierarchy.agents.PaymentsAgent
+    type_name: spade_llm.demo.platform.hierarchy.agents.SavingsAgent
     args:
       balance: 100000
   financial_assistant:
@@ -63,5 +63,5 @@ agents:
   user:
     type_name: spade_llm.agents.console.ConsoleAgent
     args:
-      delegate_type: financial_assistant
+      delegate_type: assistant
 wait_for_agents: [user]

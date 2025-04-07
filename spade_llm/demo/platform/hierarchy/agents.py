@@ -73,6 +73,7 @@ class PaymentsAgent(Agent, Configurable[FinancialAgentConf]):
 
     def setup(self):
         self.add_behaviour(self.PaymentBehaviour(self.config))
+        self.add_behaviour(self.ReplenishBehaviour(self.config))
 
 @configuration(FinancialAgentConf)
 class SavingsAgent(Agent, Configurable[FinancialAgentConf]):
@@ -106,10 +107,12 @@ class SavingsAgent(Agent, Configurable[FinancialAgentConf]):
                            .request_approval("user")
                            .with_content(f"Replenish current account from savings for {replenish_request.amount}"))
 
+                    self.logger.info("Waiting for user approval...")
                     msg = await self.receive(
                         template = MessageTemplate(
                             thread_id=self.context.thread_id, validator=MessageTemplate.from_agent("user")),
                         timeout=60)
+                    self.logger.info("Received message: %s", msg)
 
                     if not msg or msg.performative != consts.ACKNOWLEDGE:
                         self.logger.warning("User did not approve replenishment.")
@@ -127,3 +130,6 @@ class SavingsAgent(Agent, Configurable[FinancialAgentConf]):
                         await (self.context
                                .reply_with_inform(self.message)
                                .with_content(f"Replenish of current account for {replenish_request.amount} successfully completed."))
+
+    def setup(self):
+        self.add_behaviour(self.ReplenishBehaviour(self.config))

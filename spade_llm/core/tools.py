@@ -101,7 +101,7 @@ class DelegateToolConfig(BaseModel, LocalToolFactory):
     agent_type: str = Field(description="Type of the agent to delegate to")
     description: str = Field(description="Description of the service provided by the agent")
     performative: str = Field(default=consts.REQUEST,description="Performative to use when delegating")
-    timeout: float = Field(default=30,description="Timeout for the agent response")
+    timeout: float = Field(default=60,description="Timeout for the agent response")
     args_schema: Optional[ArgsSchema] = Field(
         default=None,
         description="Schema of arguments to pass to the agent. If not provided, query will be passed as a plain string.")
@@ -131,7 +131,7 @@ class DelegateToolConfig(BaseModel, LocalToolFactory):
                 await asyncio.wait_for(receiver.join(), self.timeout)
                 return receiver.message.content
             except asyncio.TimeoutError:
-                self.agent.remove_behaviour(receiver)
+                agent.remove_behaviour(receiver)
                 return "Failed to receive a response from the agent due to timeout"
 
 
