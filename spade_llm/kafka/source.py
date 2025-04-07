@@ -56,7 +56,10 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
                     logger.warning(f"Kafka error: {msg.error()}")
                 else:
                     logger.debug(f"Received message: {msg.value().decode()}")
-                    sink.post_message(Message.model_validate_json(msg.value().decode()))
+                    try:
+                        sink.post_message(Message.model_validate_json(msg.value().decode()))
+                    except Exception as e:
+                        logger.exception(f"Failed to process message: {str(e)}")
         finally:
             try:
                 self._consumer.close()
