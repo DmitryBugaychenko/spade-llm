@@ -1,4 +1,5 @@
 import threading
+import logging
 
 from aiologic import Event
 from confluent_kafka import Consumer
@@ -8,6 +9,7 @@ from spade_llm.core.api import MessageSink, Message
 from spade_llm.core.conf import configuration, Configurable
 from spade_llm.kafka.sink import KafkaConfig
 
+logger = logging.getLogger(__name__)
 
 class KafkaConsumerConfig(KafkaConfig, extra="allow"):
     group_id: str = Field(
@@ -31,10 +33,12 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
     _event: Event
 
     def configure(self):
+        logger.info("Initializing KafkaMessageSource")
         self._consumer = Consumer(self.config.model_dump(by_alias=True, exclude={"agent_to_topic_mapping"}))
         self._event = Event()
 
     def start(self, sink: MessageSink):
+        logger.info("Starting KafkaMessageSource")
         self._running = True
         self._thread = threading.Thread(target=self.consume_messages, args=(sink,))
         self._thread.start()
@@ -49,16 +53,19 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
                 if msg is None:
                     continue
                 elif msg.error():
-                    print(f"Kafka error: {msg.error()}")
+                    logger.warning(f"Kafka error: {msg.error()}")
                 else:
+                    logger.debug(f"Received message: {msg.value().decode()}")
                     sink.post_message(Message.model_validate_json(msg.value().decode()))
         finally:
             try:
                 self._consumer.close()
             finally:
+                logger.info("Stopping KafkaMessageSource")
                 self._event.set()
 
     def stop(self):
+        logger.info("Stop requested for KafkaMessageSource")
         self._running = False
 
     async def join(self):
