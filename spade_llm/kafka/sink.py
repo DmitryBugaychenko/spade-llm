@@ -42,7 +42,7 @@ class KafkaMessageSink(MessageSink, EventLoopThread, Configurable[KafkaProducerC
         logger.info("Kafka producer initialized.")
 
     async def post_message(self, msg: Message):
-        logger.debug(f"Sending message to Kafka: {msg}")
+        logger.debug("Sending message to Kafka", extra={'msg': msg})
         self.loop.call_soon_threadsafe(self._post_message_sync, msg)
 
     def _post_message_sync(self, msg):
@@ -53,7 +53,7 @@ class KafkaMessageSink(MessageSink, EventLoopThread, Configurable[KafkaProducerC
                 key=msg.receiver.agent_id.encode(),
                 value=msg.content.encode())
         except Exception as e:
-            logger.warning(f"Failed to produce message on topic '{topic}': {e}")
+            logger.warning("Failed to produce message on topic '%s'", topic, exc_info=e)
 
     def close(self):
         logger.info("Closing Kafka producer...")
