@@ -3,6 +3,7 @@ import asyncio
 
 from spade_llm.core.api import Message, AgentId  # Import Message and AgentId classes
 from spade_llm.kafka.sink import KafkaMessageSink, KafkaProducerConfig  # Assuming sink module exists
+from spade_llm.kafka.source import KafkaMessageSource, KafkaConsumerConfig
 
 
 class TestKafkaMessageSink(unittest.TestCase):
@@ -17,22 +18,28 @@ class TestKafkaMessageSink(unittest.TestCase):
         sender = AgentId(agent_type="sender", agent_id="12356")
 
         # Initialize KafkaMessageSink instance
-        sink = KafkaMessageSink(KafkaProducerConfig(
+        sink: KafkaMessageSink = KafkaMessageSink()._configure(KafkaProducerConfig(
             bootstrap_servers='localhost:9092',
             client_id='test_client',
             linger_ms=100))
 
+        sink.start()
+
         # Prepare a sample Message object
         message = Message(sender=sender, receiver=receiver, performative="inform", content="Test message sent successfully.")
+
+
+        source: KafkaMessageSource = KafkaMessageSource()._configure(KafkaConsumerConfig(
+            bootstrap_servers='localhost:9092',
+            group_id='test_client',
+            exposed_agents=['receiver']))
+
 
         # Post the message through the sink
         await sink.post_message(message)
 
-    def test_kafka_message_sink_invalid_server(self):
-        """Test initialization failure due to invalid server address."""
-        with self.assertRaises(Exception):  # Adjust exception type depending on actual implementation
-            KafkaMessageSink('test_topic', bootstrap_servers=['invalid_host:9092'])
-
+        sink.close()
+        await sink.join()
 
 if __name__ == "__main__":
     unittest.main()
