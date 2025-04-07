@@ -25,32 +25,36 @@ class KafkaConsumerConfig(KafkaConfig, extra="allow"):
 @configuration(KafkaConsumerConfig)
 class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
     _consumer: Consumer
+    _running: bool = False
+    _thread: threading.Thread
 
     def configure(self):
         self._consumer = Consumer(self.config.model_dump(by_alias=True, exclude=["agent_to_topic_mapping"]))
 
     def start(self, sink: MessageSink):
-        # Create a new thread to handle consuming messages
-        def consume_messages():
-            try:
-                # Subscribe to topics based on exposed agents
-                topics = [self.config.agent_to_topic_mapping.get(agent, agent) for agent in self.config.exposed_agents]
-                self._consumer.subscribe(topics)
-                
-                while True:
-                    msg = self._consumer.poll(timeout=1.0)
-                    
-                    if msg is None:
-                        continue
-                    elif msg.error():
-                        print(f"Kafka error: {msg.error()}")
-                    else:
-                        # Pass the received message to the sink
-                        sink.process_message(msg.value())
-            
-            except Exception as e:
-                print(f"Error occurred during consumption: {e}")
-        
-        # Start the consumer thread
-        consumer_thread = threading.Thread(target=consume_messages)
-        consumer_thread.start()
+        self._running = True
+        self._thread = threading.Thread(target=self.consume_messages, args=(sink,))
+        self._thread.start()
+
+    def consume_messages(self, sink: MessageSink):
+        try:
+            topics = [self.config.agent_to_topic_mapping.get(agent, agent) for agent in self.config.exposed_agents]
+            self._consumer.subscribe(topics)
+
+            while self._running:
+                msg = self._consumer.poll(timeout=1.0)
+                if msg is None:
+                    continue
+                elif msg.error():
+                    print(f"Kafka error: {msg.error()}")
+                else:
+                    sink.process_message(msg.value())
+        finally:
+            self._consumer.close()
+
+    def stop(self):
+        self._running = False
+
+    def join(self):
+        if hasattr(self, '_thread') and self._thread.is_alive():
+            self._thread.join()
