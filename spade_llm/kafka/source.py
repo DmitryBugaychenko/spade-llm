@@ -1,13 +1,12 @@
+import threading
+
+from aiologic import Event
 from confluent_kafka import Consumer
 from pydantic import Field
-from aiolog import Event
 
-from spade_llm.core.api import MessageSink
+from spade_llm.core.api import MessageSink, Message
 from spade_llm.core.conf import configuration, Configurable
-from spade_llm.core.threading import EventLoopThread
 from spade_llm.kafka.sink import KafkaConfig
-import threading
-import asyncio
 
 
 class KafkaConsumerConfig(KafkaConfig, extra="allow"):
@@ -32,7 +31,7 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
     _event: Event
 
     def configure(self):
-        self._consumer = Consumer(self.config.model_dump(by_alias=True, exclude=["agent_to_topic_mapping"]))
+        self._consumer = Consumer(self.config.model_dump(by_alias=True, exclude={"agent_to_topic_mapping"}))
         self._event = Event()
 
     def start(self, sink: MessageSink):
@@ -52,13 +51,15 @@ class KafkaMessageSource(Configurable[KafkaConsumerConfig]):
                 elif msg.error():
                     print(f"Kafka error: {msg.error()}")
                 else:
-                    sink.process_message(msg.value())
+                    sink.post_message(Message.model_validate_json(msg.value().decode()))
         finally:
-            self._consumer.close()
-            self._event.set()
+            try:
+                self._consumer.close()
+            finally:
+                self._event.set()
 
     def stop(self):
         self._running = False
 
     async def join(self):
-        await self._event.wait()
+        await self._event
