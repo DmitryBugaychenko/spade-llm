@@ -1,23 +1,35 @@
 messaging:
+  # This type of message source can receive messages from external systems and
+  # send messages to them.
   type_name: spade_llm.core.messaging.ExposedMessageSource
   args:
+    # The name of the system as seen by other systems. This name is added as a part
+    # of agent type for all outgoing messages
     system_name: test_system
+    # Messaging for internal agents communications
     internal:
       type_name: spade_llm.core.messaging.DictionaryMessageService
+    # Message bridge to use to fetch messages from external sources and pass them
+    # to the internal messaging
     bridge:
+      # Kafka source for messaging
       type_name: spade_llm.kafka.source.KafkaMessageSource
       args:
         bootstrap_servers: localhost:9092
         group_id: test_client
+    # List of agents to available for messages from external systems, only this agents are
+    # visible externally.
     exposed_agents: [console, echo]
+    # List of external systems agents can send messages to
     external_systems:
+      # Name of the system used as a part of agent address.
       test_system:
+        # System connected to the local kafka broker
         type_name: spade_llm.kafka.sink.KafkaMessageSink
         args:
           bootstrap_servers: localhost:9092
           client_id: test_client
           linger_ms: 0
-
 storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
 agents:
@@ -26,5 +38,6 @@ agents:
   console:
     type_name: spade_llm.agents.console.ConsoleAgent
     args:
+      # Delegate agent provided with system name specification
       delegate_type: echo@test_system
 wait_for_agents: [console]

@@ -2,33 +2,47 @@ messaging:
   type_name: spade_llm.core.messaging.DictionaryMessageService
 storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
+
+# Define the chat models to use
 chat_models:
+  # Connection to GigaChat 2 Lite
   giga:
     type_name: spade_llm.models.gigachat.GigaChatModelFactory
     args:
       credentials: env.GIGA_CRED
       model: GigaChat-2
       verify_ssl_certs: False
+
+# Tools available in the system
 tools:
+  # Wikipedia search
   wikipedia:
+    # Factory capable of creating standard LangChain tools
     type_name: spade_llm.core.tools.LangChainApiWrapperToolFactory
     args:
+      # Reference the WikipediaQueryRun tool
       type_name: langchain_community.tools.WikipediaQueryRun
       api_wrapper:
+        # Wrapper around Wikipedia API with its configuration
         type_name: langchain_community.utilities.WikipediaAPIWrapper
         args:
           top_k_results: 1
           doc_content_chars_max: 4096
           lang: en
 agents:
+  # Simple react agent connected to LLM
   react:
     type_name: spade_llm.core.react.ReactAgent
     args:
+      # System prompt for the agent
       system_prompt: |
         You are a personal assistant helping with different matters.
         Use provided tools to solve user tasks.
+      # Model to use
       model: giga
+    # Tools available to the agent
     tools: [wikipedia]
+  # Console agent which listens for commands from console and sends them to the delegate agent
   console:
     type_name: spade_llm.agents.console.ConsoleAgent
     args:

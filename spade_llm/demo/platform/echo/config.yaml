@@ -1,12 +1,19 @@
+# Configuration of the messaging system. For demo internal in-memory messaging is used
 messaging:
   type_name: spade_llm.core.messaging.DictionaryMessageService
+# Configuration of the agent state storage. For demo internal in-memory storage is used
 storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
+# Agents to host in the system
 agents:
+  # Echo agent which replies back to the sender of the message with the same content
   echo:
     type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+  # Console agent which listens for commands from console and sends them to the delegate agent
   console:
     type_name: spade_llm.agents.console.ConsoleAgent
     args:
+      # Delegate agent to use
       delegate_type: echo
+# Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
 wait_for_agents: [console]

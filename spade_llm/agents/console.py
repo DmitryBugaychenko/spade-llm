@@ -41,7 +41,7 @@ class HandleRequestBehavior(ContextBehaviour):
                 await (self.context.reply_with_refuse(reply).with_content(""))
             return
 
-        print(f"Assistant: {self.extract_message(reply)}.")
+        print(f"Assistant: {self.extract_message(reply)}")
         if reply.performative == consts.REQUEST:
             response = await ainput(self.config.prompt)
             await (self.context.reply_with_inform(reply).with_content(response))
