@@ -1,18 +1,21 @@
-from asyncio import sleep as asleep
-import asyncio
-from typing import Optional, Dict
-
-from pydantic import BaseModel, Field
-from aiogram.filters import Command
-
-from spade_llm import consts
 from spade_llm.core.agent import Agent
 from spade_llm.core.api import AgentId, AgentContext
-from spade_llm.core.behaviors import ContextBehaviour, MessageTemplate
-from spade_llm.core.conf import configuration, Configurable
 from spade_llm.core.tools import SingleMessage
+from spade_llm.core.behaviors import MessageTemplate, ContextBehaviour
+from spade_llm.core.conf import configuration, Configurable
+from asyncio import sleep as asleep
 
-from spade_llm.agents.bot import TelegramBot
+from pydantic import BaseModel, Field
+
+from spade_llm.demo.platform.tg_example.bot import TelegramBot
+
+"""Есть пример небольшого агента который считывает ввод клиента с консоли 
+и прокидывает дальше в МАС https://github.com/DmitryBugaychenko/spade-llm/blob/main/spade_llm/agents/console.py,
+ надо сделать такого же, но подключающегося к телеграм боту и пример запуска по аналогии 
+ с https://github.com/DmitryBugaychenko/spade-llm/tree/main/spade_llm/demo/platform/echo.
+  Оформить пулл реквестом. Для разработки можно использовать любых ИИ-помощников, 
+  но желательно доступных в России без ВПН. 
+  Если возникнут вопросы - уточнить у Дмитрия в ТГ @dmitrybugaychenko"""
 
 
 class TelegramAgentConf(BaseModel):
@@ -38,25 +41,9 @@ class TgRequestBehavior(ContextBehaviour):
         if not reply:
             print(f"No response received in {self.config.timeout} seconds")
             return
-
-        # if reply.performative == consts.REQUEST_APPROVAL:
-        #     action = self.extract_message(reply)
-        #     response = 'n'
-        #     # response = await ainput(f"Do you want to approve the action '{action}'? [y/n] ")
-        #     if response.lower() == "y":
-        #         await (self.context.reply_with_acknowledge(reply).with_content(""))
-        #     else:
-        #         await (self.context.reply_with_refuse(reply).with_content(""))
-        #     return
         msg = "Assistant: " + self.extract_message(reply)
         await self.my_bot.bot_reply(reply_text=msg)
         print(msg)
-        # if reply.performative == consts.REQUEST:
-        #     # response = await ainput(self.config.prompt)
-        #     response = 'response'
-        #     await (self.context.reply_with_inform(reply).with_content(response))
-        #     return
-
         self.set_is_done()
 
     def extract_message(self, reply):
@@ -78,17 +65,16 @@ class TgChatBehavior(ContextBehaviour):
     async def step(self):
         # Small hack to let all the logs to be printed before prompting
         await asleep(0.5)
-        # Вот тут нужно получать user_input
-        user_input = await self.my_bot.bot_start()
+
+        user_input = await self.my_bot.get_last_message()
         print(f"Processing input: {user_input}")
         if user_input is None:
-            print('None')
+            print('Input is none')
         elif user_input.lower() in self.config.stop_words:
             self.agent.stop()
             self.set_is_done()
         else:
 
-            # нужно перенаправить вывод в self.my_bot.bot_reply(text)
             thread = await self.context.fork_thread()
 
             await (thread
@@ -103,8 +89,9 @@ class TgChatBehavior(ContextBehaviour):
 
 
 @configuration(TelegramAgentConf)
-class TelegramAgent(Agent, Configurable[TelegramAgentConf]):
+class Bot(Agent, Configurable[TelegramAgentConf]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
     def setup(self):
         self.add_behaviour(TgChatBehavior(self.default_context, self.config))
