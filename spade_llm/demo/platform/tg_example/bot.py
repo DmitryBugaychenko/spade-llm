@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters.state import State, StatesGroup
 from aiogram.filters import Command
 import asyncio
-
+import logging
 
 class Form(StatesGroup):
     """Состояния бота для FSM."""
@@ -21,7 +21,10 @@ class TelegramBot:
         self.bot = Bot(token=self.TOKEN)
         self.message_queue = asyncio.Queue()
         self.current_chat_id = None
+        # Логи бота нас не очень инетерсуют
+        logging.getLogger("aiogram").setLevel(logging.WARNING)
         self._reg_handler()
+
 
     def _reg_handler(self):
         """Регистрирует обработчики команд и сообщений."""
