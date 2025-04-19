@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from spade_llm.demo.platform.tg_example.bot import TelegramBot
 
+from spade_llm.core.models import CredentialsUtils
 """Есть пример небольшого агента который считывает ввод клиента с консоли 
 и прокидывает дальше в МАС https://github.com/DmitryBugaychenko/spade-llm/blob/main/spade_llm/agents/console.py,
  надо сделать такого же, но подключающегося к телеграм боту и пример запуска по аналогии 
@@ -19,7 +20,7 @@ from spade_llm.demo.platform.tg_example.bot import TelegramBot
 
 
 class TelegramAgentConf(BaseModel):
-    bot_token: str = Field(description="Telegram bot token")
+    # bot_token: str = Field(description="Telegram bot token")
     allowed_chat_ids: list[int] = Field(default_factory=list, description="List of allowed chat IDs")
     delegate_type: str = Field(description="Type of the delegate agent to send messages to.")
     delegate_id: str = Field(default="default", description="ID of the delegate agent to send messages to.")
@@ -28,8 +29,8 @@ class TelegramAgentConf(BaseModel):
 
 
 class TgRequestBehavior(ContextBehaviour):
-    # надо чекнуть что bot класса telegramm bot
-    def __init__(self, context: AgentContext, config: TelegramAgentConf, request: str, bot):
+    # надо чекнуть что bot класса telegram bot
+    def __init__(self, context: AgentContext, config: TelegramAgentConf, request: str, bot: TelegramBot):
         super().__init__(context)
         self.config = config
         self.request = request
@@ -39,11 +40,11 @@ class TgRequestBehavior(ContextBehaviour):
         reply = await self.receive(MessageTemplate(thread_id=self.context.thread_id), self.config.timeout)
 
         if not reply:
-            print(f"No response received in {self.config.timeout} seconds")
+            self.logger.info(f"No response received in {self.config.timeout} seconds")
             return
         msg = "Assistant: " + self.extract_message(reply)
         await self.my_bot.bot_reply(reply_text=msg)
-        print(msg)
+        # print(msg)
         self.set_is_done()
 
     def extract_message(self, reply):
@@ -60,16 +61,17 @@ class TgChatBehavior(ContextBehaviour):
     def __init__(self, context: AgentContext, config: TelegramAgentConf):
         super().__init__(context)
         self.config = config
-        self.my_bot = TelegramBot(self.config.bot_token)
+        TOKEN = CredentialsUtils.inject_env("env.BOT_TOKEN")
+        self.my_bot = TelegramBot(TOKEN)
 
     async def step(self):
         # Small hack to let all the logs to be printed before prompting
         await asleep(0.5)
 
         user_input = await self.my_bot.get_last_message()
-        print(f"Processing input: {user_input}")
+        self.logger.info(f"Processing input: {user_input}")
         if user_input is None:
-            print('Input is none')
+            self.logger.warning('Input is none')
         elif user_input.lower() in self.config.stop_words:
             self.agent.stop()
             self.set_is_done()

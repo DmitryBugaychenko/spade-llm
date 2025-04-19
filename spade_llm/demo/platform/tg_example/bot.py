@@ -38,6 +38,7 @@ class TelegramBot:
             """Обрабатывает текстовые сообщения пользователя в состоянии ожидания."""
             self.last_message = message
             await self.message_queue.put(message.text)
+            # Управиться без bot_stop
             await self.bot_stop()
 
     async def bot_start(self):

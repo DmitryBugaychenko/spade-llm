@@ -13,7 +13,7 @@ agents:
   bot:
     type_name: spade_llm.demo.platform.tg_example.agents.Bot
     args:
-      bot_token: # here should be TgBot token
+      # bot_token: env.BOT_TOKEN
       delegate_type: echo
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
 wait_for_agents: [ bot ]
