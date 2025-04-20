@@ -13,10 +13,16 @@ Configure TG_bot token
 ```
 export BOT_TOKEN=<your Tg_bot token from BotFather>
 ```
-# For windows 
+# For windows cmd
 ```
 set BOT_TOKEN=<your Tg_bot token from BotFather>
 ```
+
+# For windows PowerShell
+```
+$env:BOT_TOKEN='<your Tg_bot token from BotFather>'
+```
+
 Run the demo
 
 ```
