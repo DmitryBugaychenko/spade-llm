@@ -3,24 +3,13 @@ from spade_llm.core.api import AgentId, AgentContext
 from spade_llm.core.tools import SingleMessage
 from spade_llm.core.behaviors import MessageTemplate, ContextBehaviour
 from spade_llm.core.conf import configuration, Configurable
-from asyncio import sleep as asleep
-
-from pydantic import BaseModel, Field
-
 from spade_llm.demo.platform.tg_example.bot import TelegramBot
-
 from spade_llm.core.models import CredentialsUtils
-"""Есть пример небольшого агента который считывает ввод клиента с консоли 
-и прокидывает дальше в МАС https://github.com/DmitryBugaychenko/spade-llm/blob/main/spade_llm/agents/console.py,
- надо сделать такого же, но подключающегося к телеграм боту и пример запуска по аналогии 
- с https://github.com/DmitryBugaychenko/spade-llm/tree/main/spade_llm/demo/platform/echo.
-  Оформить пулл реквестом. Для разработки можно использовать любых ИИ-помощников, 
-  но желательно доступных в России без ВПН. 
-  Если возникнут вопросы - уточнить у Дмитрия в ТГ @dmitrybugaychenko"""
+from asyncio import sleep as asleep
+from pydantic import BaseModel, Field
 
 
 class TelegramAgentConf(BaseModel):
-    # bot_token: str = Field(description="Telegram bot token")
     allowed_chat_ids: list[int] = Field(default_factory=list, description="List of allowed chat IDs")
     delegate_type: str = Field(description="Type of the delegate agent to send messages to.")
     delegate_id: str = Field(default="default", description="ID of the delegate agent to send messages to.")
@@ -29,7 +18,6 @@ class TelegramAgentConf(BaseModel):
 
 
 class TgRequestBehavior(ContextBehaviour):
-    # надо чекнуть что bot класса telegram bot
     def __init__(self, context: AgentContext, config: TelegramAgentConf, request: str, bot: TelegramBot):
         super().__init__(context)
         self.config = config
@@ -44,7 +32,6 @@ class TgRequestBehavior(ContextBehaviour):
             return
         msg = "Assistant: " + self.extract_message(reply)
         await self.my_bot.bot_reply(reply_text=msg)
-        # print(msg)
         self.set_is_done()
 
     def extract_message(self, reply):
