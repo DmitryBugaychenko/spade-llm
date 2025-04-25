@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters.state import State, StatesGroup
 from aiogram.filters import Command
 import asyncio
-import logging
+import logging.config
 
 
 class Form(StatesGroup):
@@ -19,21 +19,18 @@ class TelegramBot:
         self.dp = Dispatcher(storage=self.storage)
         self.bot = Bot(token=self.TOKEN)
         self.message_queue = asyncio.Queue()
-        self.current_chat_id = None
-        # Логи бота нас не очень инетерсуют
-        logging.getLogger("aiogram").setLevel(logging.WARNING)
+        logging.config.fileConfig('./spade_llm/demo/platform/tg_example/logging_config.ini')
         self._reg_handler()
 
     def _reg_handler(self):
         @self.dp.message(Command("start"), F.text)
         async def handle_start(message: types.Message, state: FSMContext):
-            self.current_chat_id = message.chat.id
             await message.reply("Бот готов к работе. Отправьте зарос.")
             await state.set_state(Form.waiting_for_input)
 
         @self.dp.message(Form.waiting_for_input, F.text)
         async def handle_message(message: types.Message):
-            await self.message_queue.put(message.text)
+            await self.message_queue.put(message)
 
     async def get_last_message(self):
         await self.wait_for_input()
@@ -62,6 +59,5 @@ class TelegramBot:
     async def bot_start(self):
         await self.dp.start_polling(self.bot)
 
-    async def bot_reply(self, reply_text='No_reply'):
-        if self.current_chat_id:
-            await self.bot.send_message(self.current_chat_id, reply_text)
+    async def bot_reply(self, chat_id: int, reply_text='Empty reply'):
+        await self.bot.send_message(chat_id=chat_id, text=reply_text)

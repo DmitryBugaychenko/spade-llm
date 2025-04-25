@@ -8,22 +8,30 @@ Install requirements
 ```
 pip install -r ./requirements.txt
 ```
-Configure TG_bot token
-# For macOS/linux:
+
+
+# Configure TG bot token
+
+You need token from BotFather to run bot. Follow [instruction](https://core.telegram.org/bots/features#creating-a-new-bot)
+to get it.
+
+After that, export this token to the local environment.
+
+## For macOS/linux:
 ```
 export BOT_TOKEN=<your Tg_bot token from BotFather>
 ```
-# For windows cmd
+## For windows cmd
 ```
 set BOT_TOKEN=<your Tg_bot token from BotFather>
 ```
 
-# For windows PowerShell
+## For windows PowerShell
 ```
 $env:BOT_TOKEN='<your Tg_bot token from BotFather>'
 ```
 
-Run the demo
+# Run the demo
 
 ```
 python -m spade_llm.boot ./spade_llm/demo/platform/tg_example/config.yaml
