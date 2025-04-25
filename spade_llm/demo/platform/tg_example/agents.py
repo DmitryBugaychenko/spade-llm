@@ -16,7 +16,7 @@ class TelegramAgentConf(BaseModel):
     delegate_type: str = Field(description="Type of the delegate agent to send messages to.")
     delegate_id: str = Field(default="default_user", description="Telegram username")
     timeout: float = Field(default=60.0, description="Timeout for receiving messages.")
-    tgbot: str = Field(description="Bot to use for handling messages.")
+    tg_bot: str = Field(description="Bot to use for handling messages.")
 
 
 class TgRequestBehavior(ContextBehaviour):
@@ -108,7 +108,7 @@ class Bot(Agent, Configurable[TelegramAgentConf]):
 
     def setup(self):
         # Создаем бота
-        bot = self.default_context.create_chat_model(self.config.tgbot)
+        bot = self.default_context.create_chat_model(self.config.tg_bot)
         self.add_behaviour(TgChatBehavior(self.default_context, self.config, bot))
 
 

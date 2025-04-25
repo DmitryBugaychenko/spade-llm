@@ -6,7 +6,7 @@ storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
 
 chat_models:
-  # Инициализация телеграмм-бота
+  # Initialization of telegram bot
   bot_init:
     type_name: spade_llm.demo.platform.tg_example.agents.TelegramBotFactory
 
