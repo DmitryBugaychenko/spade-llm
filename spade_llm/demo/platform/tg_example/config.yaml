@@ -5,11 +5,6 @@ messaging:
 storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
 
-chat_models:
-  # Initialization of telegram bot
-  bot_init:
-    type_name: spade_llm.demo.platform.tg_example.agents.TelegramBotFactory
-
 agents:
   # Агент отвечающий за ответ на запрос пользователя (В данном случае просто возвращается его же сообщение)
   echo:
@@ -18,7 +13,10 @@ agents:
   bot:
     type_name: spade_llm.demo.platform.tg_example.agents.Bot
     args:
-      tg_bot: bot_init
+      tg_bot:
+        type_name:  spade_llm.demo.platform.tg_example.bot.TelegramBot
+        args:
+            TOKEN: env.BOT_TOKEN
       delegate_type: echo
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
 wait_for_agents: [ bot ]

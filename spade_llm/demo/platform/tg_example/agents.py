@@ -4,10 +4,14 @@ from spade_llm.core.tools import SingleMessage
 from spade_llm.core.behaviors import MessageTemplate, ContextBehaviour
 from spade_llm.core.conf import configuration, Configurable, EmptyConfig
 from spade_llm.demo.platform.tg_example.bot import TelegramBot
-from spade_llm.core.models import CredentialsUtils, ChatModelFactory
+from spade_llm.core.models import CredentialsUtils
 from spade_llm import consts
 from asyncio import sleep as asleep
 from pydantic import BaseModel, Field
+from typing import cast, TypeVar, Type, Union, Any
+from abc import abstractmethod, ABCMeta
+
+T = TypeVar('T')
 
 
 class TelegramAgentConf(BaseModel):
@@ -16,7 +20,7 @@ class TelegramAgentConf(BaseModel):
     delegate_type: str = Field(description="Type of the delegate agent to send messages to.")
     delegate_id: str = Field(default="default_user", description="Telegram username")
     timeout: float = Field(default=60.0, description="Timeout for receiving messages.")
-    tg_bot: str = Field(description="Bot to use for handling messages.")
+    tg_bot: dict = Field(description="Telegram bot properties")
 
 
 class TgRequestBehavior(ContextBehaviour):
@@ -107,13 +111,21 @@ class Bot(Agent, Configurable[TelegramAgentConf]):
         super().__init__(*args, **kwargs)
 
     def setup(self):
-        # Создаем бота
-        bot = self.default_context.create_chat_model(self.config.tg_bot)
+        bot_config = self.config.tg_bot['args']
+        bot = CustomTypeEntityFactory().create_custom_type_entity(TelegramBot, bot_config.keys(), bot_config)
         self.add_behaviour(TgChatBehavior(self.default_context, self.config, bot))
 
 
+class AbstractCustomTypeEntityFactory(metaclass=ABCMeta):
+    @abstractmethod
+    def create_custom_type_entity(self, cls: Type[T], env_params: list[str], conf: dict[str, Any]) -> T:
+        pass
+
+
 @configuration(EmptyConfig)
-class TelegramBotFactory(ChatModelFactory[TelegramBot], Configurable[EmptyConfig]):
-    def create_model(self) -> TelegramBot:
-        TOKEN = CredentialsUtils.inject_env("env.BOT_TOKEN")
-        return TelegramBot(TOKEN)
+class CustomTypeEntityFactory(AbstractCustomTypeEntityFactory, Configurable[EmptyConfig]):
+    def create_custom_type_entity(self, cls: Type[T], env_params: list[str], conf: dict[str, Any]) -> T:
+        # Injecting params from enviroment
+        entity_env_params = CredentialsUtils.inject_env_dict(env_params, conf)
+        instance = cls(**entity_env_params)
+        return instance
