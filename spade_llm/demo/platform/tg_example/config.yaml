@@ -1,0 +1,23 @@
+# Configuration of the messaging system. For demo internal in-memory messaging is used
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+# Configuration of the agent state storage. For demo internal in-memory storage is used
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+
+agents:
+  # Агент отвечающий за ответ на запрос пользователя (В данном случае просто возвращается его же сообщение)
+  echo:
+    type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+  # Бот отвечает за получение и отправку сообщений пользователю, и за инициализацию тг-бота
+  bot:
+    type_name: spade_llm.demo.platform.tg_example.agents.Bot
+    args:
+      tg_bot:
+        type_name:  spade_llm.demo.platform.tg_example.bot.TelegramBot
+        args:
+            TOKEN: env.BOT_TOKEN
+      delegate_type: echo
+# Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
+wait_for_agents: [ bot ]
+
