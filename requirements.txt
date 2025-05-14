@@ -14,7 +14,7 @@ aiosqlite~=0.21.0
 async_lru-threadsafe~=2.0.4
 urllib3~=2.3.0
 numpy~=1.26.4
-pandas~=2.0.3
+pandas~=2.2.3
 slixmpp~=1.8.5
 requests~=2.32.3
 certifi~=2025.1.31
@@ -23,3 +23,6 @@ aiologic~=0.14.0
 PyYAML~=6.0.2
 pydantic_core~=2.27.2
 confluent-kafka~=2.9.0
+aiogram==3.20.0
+APScheduler==3.10.4
+python-decouple==3.8
