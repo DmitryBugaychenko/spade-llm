@@ -15,6 +15,12 @@ to get them. You can use any langchain compatible model capable of using tools, 
 export GIGA_CRED=<your access token>
 ```
 
+If you want to specify API version. Follow [instruction](https://developers.sber.ru/docs/ru/gigachain/overview#langchain-gigachat)
+to check them. And export your API version using command
+```
+export GIGACHAT_SCOPE=<your API version>
+```
+
 Run the demo
 
 ```

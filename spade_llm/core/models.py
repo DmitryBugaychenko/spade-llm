@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, SecretStr
 
 from spade_llm.core.conf import ConfigurableRecord
 
@@ -21,14 +21,22 @@ class CredentialsUtils:
             return val
 
     @staticmethod
-    def inject_env_dict(keys: list[str], conf: dict[str, Any]):
+    def inject_env_dict(keys: list[str], conf: dict[str, Any], extra_params: dict[str, Any] = None):
         """
         For each key in keys list check if it is mentioned in dict and applies inject_env to its value.
         Used to substitute credentials from environment variables.
+        You may provide extra arguments into config via extra_params.
         """
         for key in keys:
             if key in conf:
-                conf[key] = CredentialsUtils.inject_env(conf[key])
+                if isinstance(conf[key], SecretStr):
+                    conf[key] = SecretStr(CredentialsUtils.inject_env(conf[key].get_secret_value()))
+                else:
+                    conf[key] = CredentialsUtils.inject_env(conf[key])
+
+        if extra_params:
+            for key in extra_params.keys():
+                conf[key] = CredentialsUtils.inject_env(extra_params[key])
         return conf
 
 
@@ -39,6 +47,8 @@ class LlmConfiguration(ConfigurableRecord):
 
 
 class ChatModelFactory[T: BaseChatModel](metaclass=ABCMeta):
+
+
     @abstractmethod
     def create_model(self) -> T:
         pass
@@ -51,6 +61,8 @@ class ChatModelConfiguration(LlmConfiguration):
 
 
 class EmbeddingsModelFactory[T: Embeddings](metaclass=ABCMeta):
+
+
     @abstractmethod
     def create_model(self) -> T:
         pass
@@ -83,13 +95,13 @@ class ModelsProvider(metaclass=ABCMeta):
 
 
 class ModelsProviderConfig(BaseModel, ModelsProvider):
-    chat_models: dict[str,ChatModelConfiguration] = Field(
-        default = dict(),
+    chat_models: dict[str, ChatModelConfiguration] = Field(
+        default=dict(),
         description="LLM models available to use as chat LLM"
     )
 
-    embeddings_models: dict[str,EmbeddingsModelConfiguration] = Field(
-        default = dict(),
+    embeddings_models: dict[str, EmbeddingsModelConfiguration] = Field(
+        default=dict(),
         description="LLM models available to use for embeddings"
     )
 
@@ -102,7 +114,7 @@ class ModelsProviderConfig(BaseModel, ModelsProvider):
         # Check if the specified chat model exists
         if name not in self.chat_models:
             raise ValueError(f"No such chat model '{name}' found.")
-        
+
         # Get the corresponding factory and create the model
         factory = self.chat_models[name].create_model_factory()
         return factory.create_model()
@@ -116,7 +128,7 @@ class ModelsProviderConfig(BaseModel, ModelsProvider):
         # Check if the specified embeddings model exists
         if name not in self.embeddings_models:
             raise ValueError(f"No such embeddings model '{name}' found.")
-        
+
         # Get the corresponding factory and create the model
         factory = self.embeddings_models[name].create_model_factory()
         return factory.create_model()
