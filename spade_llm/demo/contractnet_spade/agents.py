@@ -4,7 +4,6 @@ import os
 from collections import UserList
 from pathlib import Path
 from typing import Optional
-from time import sleep
 from asyncio import sleep as asleep
 import asyncio
 import aiosqlite
@@ -24,9 +23,6 @@ from pydantic.fields import Field
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.core.api import Message
-from spade_llm.behaviours import SendAndReceiveBehaviour
-from spade_llm.builders import MessageBuilder
-from spade_llm.consts import Templates
 from spade_llm.contractnet_platform import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
     ContractNetResponderBehavior, ContractNetInitiatorBehavior
 from spade_llm.discovery_platform import AgentDescription, AgentTask
