@@ -92,6 +92,7 @@ class RegisterAgentBehaviour(MessageHandlingBehavior):
 
     async def step(self):
         if self.message:
+            # May be problem during souble register request in one time
             description = AgentDescription.model_validate_json(json_data=self.message.content)
             self.config.agents[description.id] = description
             logger.debug("Got description %s", self.message.content)

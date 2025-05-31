@@ -67,7 +67,6 @@ class ContractNetResponderBehavior(MessageHandlingBehavior):
 
             else:
                 await self.context.reply_with_refuse(msg).with_content("")
-            self.set_is_done()
 
 
 class ContractNetInitiatorBehavior(ContextBehaviour):

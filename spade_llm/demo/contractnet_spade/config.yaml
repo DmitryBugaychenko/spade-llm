@@ -35,6 +35,10 @@ agents:
     type_name: spade_llm.demo.contractnet_spade.agents.SpendingProfileAgent
     args:
       model: max
+  transaction_agent:
+    type_name: spade_llm.demo.contractnet_spade.agents.TransactionsAgent
+    args:
+      model: max
   df:
     type_name: spade_llm.discovery_platform.DirectoryFacilitatorAgent
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.

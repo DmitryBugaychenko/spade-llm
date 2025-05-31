@@ -205,22 +205,21 @@ class PeriodExpertAgentConf(BaseModel):
 @configuration(PeriodExpertAgentConf)
 class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
     class RequestBehaviour(MessageHandlingBehavior):
-        def __init__(self, config: PeriodExpertAgentConf):
+        def __init__(self, config: PeriodExpertAgentConf, model: BaseChatModel):
             super().__init__(MessageTemplate.request())
             self.parser = PydanticOutputParser(pydantic_object=Period)
             self.config = config
+            self.model = model
 
         get_period_prompt = PromptTemplate.from_template(
             """Сегодняшняя датa {date}. Определи какой период времени озвучен в запросе "{query}" и ответь 
             в формате `json`\n{format_instructions}""")
 
         async def step(self) -> None:
-            msg = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
+            msg = self.message
             if msg:
                 query = msg.content
-
                 response = await self.get_period(query)
-
                 await self.context.reply_with_inform(msg).with_content(response)
 
         @alru_cache(maxsize=1024)
@@ -233,11 +232,12 @@ class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
                 }
             )
             chain = self.model | self.parser
+            await asyncio.sleep(1.5)
             response: Period = await chain.ainvoke(request)
             return response
 
     def setup(self) -> None:
-        self.add_behaviour(self.RequestBehaviour(self.config))
+        self.add_behaviour(self.RequestBehaviour(self.config,model=self.default_context.create_chat_model(self.config.model)))
 
 
 class SpendingProfileAgentConf(BaseModel):
@@ -392,24 +392,23 @@ class TransactionsAgentConf(BaseModel):
     mcc_expert: str = Field(description="Agent ID of MCC expert.", default="mcc_expert")
     period_expert: str = Field(description="Agent ID of period expert.", default="period_expert")
     df_address: str = Field(description="Address of data frame agent.", default="df")
-    model: BaseChatModel = Field(description="Model to use for generating responses.")
+    model: str = Field(description="Model to use for generating responses.")
     table_name: str = Field(description="Table name to use for storing agents.", default="transactions")
 
 
 @configuration(TransactionsAgentConf)
 class TransactionsAgent(SpendingProfileAgent):
     async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
-        return ContractNetProposal(author=str(self.jid), estimate=10, request=request)
+        return ContractNetProposal(author=self.agent_type, estimate=10, request=request)
 
     class RequestBehaviour(SpendingProfileAgent.RequestBehaviour):
 
-        async def request_ids(self, mcc: int, thread: str, query: str):
-            response = await self.get_period(query)
-
-            if response == None or Templates.FAILURE().match(response):
+        async def request_ids(self, mcc: int,  query: str):
+            msg = await self.get_period(query)
+            if not msg or msg.performative == consts.FAILURE:
                 return []
             else:
-                period = Period.model_validate_json(response.content)
+                period = Period.model_validate_json(msg.content)
                 cursor: Cursor = await self.db.execute(
                     f"""SELECT client_id FROM {self.table_name} 
                     WHERE mcc={mcc} AND date BETWEEN '{period.start}' AND '{period.end}'
@@ -420,17 +419,13 @@ class TransactionsAgent(SpendingProfileAgent):
                 return rows
 
         async def get_period(self, query):
-            period_req = await self.context.fork_thread()
-            await (period_req.request('period_expert').with_content(query))
-
-            receiver = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
-
-            response = receiver.response
+            await (self.context.request('period_expert').with_content(query))
+            response = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
             return response
 
     def create_description(self) -> AgentDescription:
         return AgentDescription(
-            id=str(1),
+            id="transaction_agent",
             description="""Агент позволяет собрать сегмент людей с определенным профилем трат.
             Имеет доступ к детальным транзакциям за все время наблюдений, способен делать выборки
             за определенный период.""",
