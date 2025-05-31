@@ -248,19 +248,17 @@ class SpendingProfileAgentConf(BaseModel):
 class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingProfileAgentConf]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db = None
 
     class RequestBehaviour(ContextBehaviour):
-        def __init__(self, context: AgentContext, config: SpendingProfileAgentConf, model: BaseChatModel,request):
+        def __init__(self, context: AgentContext, config: SpendingProfileAgentConf, model: BaseChatModel, db: Connection, request):
             super().__init__(context)
-            self.db = None
+            self.db = db
             self.model = model
             self.table_name = config.table_name
             self.mcc_expert = config.mcc_expert
             self.config = config
             self.request = request
             self.result = None
-            asyncio.create_task(self.make_db())
 
         async def step(self):
             self.result = await self.handle(self.request.request.task)
@@ -289,29 +287,29 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
             receiver = await self.receive(MessageTemplate(self.context.thread_id), timeout=20)
             return receiver
 
-        async def check_table(self, file_path):
-            cursor: Cursor = await self.db.execute(f"""SELECT type FROM sqlite_master WHERE
-                name='{self.config.table_name}'; """)
-            row = await cursor.fetchone()
-            if row is None:
-                logger.error("Table with data not found %s", self.config.table_name)
-                raise FileNotFoundError(
-                    errno.ENOENT, os.strerror(errno.ENOENT), str(file_path.joinpath(self.table_name)))
-            await cursor.close()
+    async def check_table(self, file_path):
+        cursor: Cursor = await self.db.execute(f"""SELECT type FROM sqlite_master WHERE
+            name='{self.config.table_name}'; """)
+        row = await cursor.fetchone()
+        if row is None:
+            logger.error("Table with data not found %s", self.config.table_name)
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), str(file_path.joinpath(self.table_name)))
+        await cursor.close()
 
-        async def connect_database(self):
-            file_path = Path(self.config.data_path).joinpath("sqlite.db")
-            if not file_path.is_file() or not file_path.exists():
-                logger.error("Profile database not found at %s", file_path)
-                raise FileNotFoundError(
-                    errno.ENOENT, os.strerror(errno.ENOENT), str(file_path))
-            logger.info("Connecting to the database at %s", file_path)
-            self.db = await aiosqlite.connect(file_path.resolve())
-            return file_path
+    async def connect_database(self):
+        file_path = Path(self.config.data_path).joinpath("sqlite.db")
+        if not file_path.is_file() or not file_path.exists():
+            logger.error("Profile database not found at %s", file_path)
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), str(file_path))
+        logger.info("Connecting to the database at %s", file_path)
+        self.db = await aiosqlite.connect(file_path.resolve())
+        return file_path
 
-        async def make_db(self):
-            file_path = await self.connect_database()
-            await self.check_table(file_path)
+    async def make_db(self):
+        file_path = await self.connect_database()
+        await self.check_table(file_path)
 
     async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
         response = await self.check_task(request.task)
@@ -335,7 +333,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
 
     async def execute(self, proposal: ContractNetProposal, msg: Message) :
         thread = await self.default_context.fork_thread()
-        handler = self.RequestBehaviour(thread, self.config, self.default_context.create_chat_model(self.config.model), proposal)
+        handler = self.RequestBehaviour(thread, self.config, self.default_context.create_chat_model(self.config.model),self.db, proposal)
         self.add_behaviour(handler)
         await handler.join()
         if handler.is_done():
@@ -372,6 +370,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
 
     def setup(self) -> None:
         asyncio.create_task(self.setup_agent())
+        asyncio.create_task(self.make_db())
         self.add_behaviour(ContractNetResponderBehavior(self))
         self.model = self.default_context.create_chat_model(self.config.model)
 
