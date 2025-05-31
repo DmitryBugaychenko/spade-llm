@@ -1,0 +1,453 @@
+import errno
+import logging
+import os
+from collections import UserList
+from pathlib import Path
+from typing import Optional
+from time import sleep
+from asyncio import sleep as asleep
+import asyncio
+import aiosqlite
+from spade_llm.core.api import AgentId, AgentContext
+from aioconsole import ainput
+from aiosqlite import Cursor, Connection
+from async_lru import alru_cache
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import CSVLoader
+from langchain_core.embeddings import Embeddings
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.vectorstores import VectorStore
+from pydantic import BaseModel
+from pydantic.fields import Field
+from spade_llm.core.agent import Agent
+from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
+from spade_llm.core.api import Message
+from spade_llm.behaviours import SendAndReceiveBehaviour
+from spade_llm.builders import MessageBuilder
+from spade_llm.consts import Templates
+from spade_llm.contractnet_platform import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
+    ContractNetResponderBehavior, ContractNetInitiatorBehavior
+from spade_llm.discovery_platform import AgentDescription, AgentTask
+from spade_llm.core.conf import configuration, Configurable
+from spade_llm.demo import models
+from spade_llm import consts
+
+logger = logging.getLogger(__name__)
+
+
+class Period(BaseModel):
+    """Describes a period of time from start to end"""
+    start: str = Field(description="Start of the period in the format YYYY-MM-DD")
+    end: str = Field(description="End of the period in the format YYYY-MM-DD")
+
+
+class UsersList(BaseModel):
+    ids: list[int] = Field(description="List of clients matching request.")
+
+
+class MccDescription(BaseModel):
+    description: str = Field(description="Описание категории транзакций")
+
+
+class MccExpertAgentConf(BaseModel):
+    model: str = Field(description="Model to use for generating responses.")
+    data_path: str = Field(description="Path to data files.", default="./data")
+
+
+class ChatAgentConf(BaseModel):
+    msg: str = Field(default="Hello World!", description="Сообщение для отправки")
+
+
+@configuration(ChatAgentConf)
+class ChatAgent(Agent, Configurable[ChatAgentConf]):
+    @staticmethod
+    def cformat(msg: str) -> str:
+        """Utility for getting more visible messages in console"""
+        return "\033[1m\033[92m{}\033[00m\033[00m".format(msg)
+
+    class ChatBehaviour(ContextBehaviour):
+        def __init__(self, context: AgentContext, config: ChatAgentConf):
+            super().__init__(context)
+            self.config = config
+
+        async def step(self) -> None:
+            # Small hack to let all the logs to be printed before prompting
+            await asleep(0.5)
+            print(ChatAgent.cformat("Введите сообщение для бота: "))
+            user_input: str = await ainput(ChatAgent.cformat("Какой сегмент собрать: "))
+
+            if user_input.lower() in {"пока", "bye"}:
+                await self.agent.stop()
+                return None
+
+            request = ContractNetInitiatorBehavior(
+                task=user_input,
+                df_address='df',
+                context=self.context,
+                time_to_wait_for_proposals=10
+            )
+
+            self.agent.add_behaviour(request)
+            await request.join()
+            # Small hack to let all the logs to be printed before prompting
+            if request.is_successful:
+                print(ChatAgent.cformat("Получен ответ: ") + request.result.content)
+                result = UsersList.model_validate_json(request.result.content)
+                head = ",".join([str(id) for id in result.ids[0:min(20, len(result.ids))]])
+                print(ChatAgent.cformat("Получен сегмент: ") + f"Размер {len(result.ids)} первые 20 ids: {head}")
+            else:
+                print(ChatAgent.cformat("Не удалось собрать сегмент."))
+
+    def setup(self):
+        self.add_behaviour(self.ChatBehaviour(self.default_context, self.config))
+
+
+@configuration(MccExpertAgentConf)
+class MccExpertAgent(Agent, Configurable[MccExpertAgentConf]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.embeddings = models.EMBEDDINGS
+        self.index = Chroma(embedding_function=self.embeddings, collection_name="MCC")
+
+    class RequestBehaviour(MessageHandlingBehavior):
+        index: VectorStore
+        model: BaseChatModel
+        parser = PydanticOutputParser(pydantic_object=MccDescription)
+
+        prepare_request_prompt = PromptTemplate.from_template(
+            """Твоя задача сформулировать описание MCC кода для транзакций, обозначающей траты людей 
+            подпадающих под характеристику "{query}". Описание должно соответствовать следующим критериям:
+            * Не менее 40 слов
+            * Отсутствие привязки ко времени
+            * Включает название товаров и услуг связанных с активностью
+            * Включает типы торговых точек и предприятий где эти товары и услуги продаются
+            Ответь в формате `json`\n{format_instructions}""")
+
+        def __init__(self, config: MccExpertAgentConf, index: VectorStore, embeddings: Embeddings,
+                     model: BaseChatModel):
+            super().__init__(MessageTemplate.request())
+            self.config = config
+            self.index = index
+            self.embeddings = embeddings
+            self.model = model
+
+        async def step(self) -> None:
+            msg = self.message
+            if msg:
+                query = msg.content
+                result = await self.find_mcc(query)
+                await self.construct_reply(msg, query, result)
+
+        @alru_cache(maxsize=1024)
+        async def find_mcc(self, query: str):
+            logger.info("Extracting code for segment description %s", query)
+            chain = self.model | self.parser
+            request: MccDescription = await chain.ainvoke(
+                await self.prepare_request_prompt.ainvoke(
+                    {"query": query,
+                     "format_instructions": self.parser.get_format_instructions()}))
+
+            logger.info("Extended description for search %s", request.description)
+            result = await self.index.asimilarity_search(query=request.description, k=1)
+            return result
+
+        async def construct_reply(self, msg, query, result):
+            if len(result) > 0:
+                doc = result[0]
+                logger.info("Resulting document %s", doc)
+                await self.context.reply_with_inform(msg).with_content(str(doc.metadata["MCC"]))
+            else:
+                logger.error("Failed to find document matching query %s", query)
+                await self.context.reply_with_failure(msg).with_content("")
+
+    async def prepare_data(self) -> None:
+        logger.info("Preparing data")
+        file_path = Path(self.config.data_path).joinpath("mcc_codes.csv")
+
+        if not file_path.is_file() or not file_path.exists():
+            logger.error("File with MCC code description not found at %s", file_path)
+            await self.stop()
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), str(file_path))
+
+        logger.info("Loading MCC from %s", file_path)
+        loader = CSVLoader(file_path=file_path.resolve(),
+                           metadata_columns=["MCC"],
+                           csv_args={
+                               'delimiter': ',',
+                               'quotechar': '"'
+                           })
+
+        documents = await loader.aload()
+        logger.info("Loaded %i codes", len(documents))
+        filtered = [x for x in documents if len(x.page_content) > 100]
+        logger.info("%i codes have enough description", len(documents))
+        await self.index.aadd_documents(filtered)
+        logger.info("Codes added to index")
+
+    async def async_setup(self):
+        await self.prepare_data()
+
+    def setup(self) -> None:
+        asyncio.create_task(self.async_setup())
+        self.add_behaviour(ContractNetResponderBehavior(self.config))
+        self.add_behaviour(self.RequestBehaviour(self.config, index=self.index, embeddings=self.embeddings,
+                                                 model=self.default_context.create_chat_model(self.config.model)))
+
+
+class PeriodExpertAgentConf(BaseModel):
+    date: str = Field(description="Date to use for calculating period.", default="2023-09-10")
+    model: str = Field(description="Model to use for generating responses.")
+
+
+@configuration(PeriodExpertAgentConf)
+class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
+    class RequestBehaviour(MessageHandlingBehavior):
+        def __init__(self, config: PeriodExpertAgentConf):
+            super().__init__(MessageTemplate.request())
+            self.parser = PydanticOutputParser(pydantic_object=Period)
+            self.config = config
+
+        get_period_prompt = PromptTemplate.from_template(
+            """Сегодняшняя датa {date}. Определи какой период времени озвучен в запросе "{query}" и ответь 
+            в формате `json`\n{format_instructions}""")
+
+        async def step(self) -> None:
+            msg = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
+            if msg:
+                query = msg.content
+
+                response = await self.get_period(query)
+
+                await self.context.reply_with_inform(msg).with_content(response)
+
+        @alru_cache(maxsize=1024)
+        async def get_period(self, query: str) -> Period:
+            request = await self.get_period_prompt.ainvoke(
+                {
+                    "query": query,
+                    "date": self.config.date,
+                    "format_instructions": self.parser.get_format_instructions()
+                }
+            )
+            chain = self.model | self.parser
+            response: Period = await chain.ainvoke(request)
+            return response
+
+    def setup(self) -> None:
+        self.add_behaviour(self.RequestBehaviour(self.config))
+
+
+class SpendingProfileAgentConf(BaseModel):
+    data_path: str = Field(description="Path to data files.", default="./data")
+    table_name: str = Field(description="Table name to use for storing agents.", default="spendings")
+    mcc_expert: str = Field(description="Agent ID of MCC expert.", default="mcc_expert")
+    df_address: str = Field(description="Address of data frame agent.", default="df_agent")
+    model: str = Field(description="Model to use for generating responses.")
+
+
+@configuration(SpendingProfileAgentConf)
+class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingProfileAgentConf]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db = None
+
+    class RequestBehaviour(ContextBehaviour):
+        def __init__(self, context: AgentContext, config: SpendingProfileAgentConf, model: BaseChatModel,request):
+            super().__init__(context)
+            self.db = None
+            self.model = model
+            self.table_name = config.table_name
+            self.mcc_expert = config.mcc_expert
+            self.config = config
+            self.request = request
+            self.result = None
+            asyncio.create_task(self.make_db())
+
+        async def step(self):
+            self.result = await self.handle(self.request.request.task)
+            self.set_is_done()
+
+        async def handle(self, task: str) -> UserList:
+            response = await self.get_mcc(task)
+            if response == None or response.performative == consts.FAILURE:
+                logging.error("Не удалось определить MCC код для данного запроса.")
+                return UserList(ids=[])
+            else:
+                mcc = int(response.content)
+                rows = await self.request_ids(mcc, task)
+                return UsersList(ids=[row[0] for row in rows])
+
+        async def request_ids(self, mcc: int, query: str):
+
+            cursor: Cursor = await self.db.execute(
+                f'SELECT client_id FROM {self.table_name} WHERE "{mcc}">0')
+            rows = await cursor.fetchall()
+            await cursor.close()
+            return rows
+
+        async def get_mcc(self, task: str):
+            await (self.context.request('mcc_expert').with_content(task))
+            receiver = await self.receive(MessageTemplate(self.context.thread_id), timeout=20)
+            return receiver
+
+        async def check_table(self, file_path):
+            cursor: Cursor = await self.db.execute(f"""SELECT type FROM sqlite_master WHERE
+                name='{self.config.table_name}'; """)
+            row = await cursor.fetchone()
+            if row is None:
+                logger.error("Table with data not found %s", self.config.table_name)
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), str(file_path.joinpath(self.table_name)))
+            await cursor.close()
+
+        async def connect_database(self):
+            file_path = Path(self.config.data_path).joinpath("sqlite.db")
+            if not file_path.is_file() or not file_path.exists():
+                logger.error("Profile database not found at %s", file_path)
+                raise FileNotFoundError(
+                    errno.ENOENT, os.strerror(errno.ENOENT), str(file_path))
+            logger.info("Connecting to the database at %s", file_path)
+            self.db = await aiosqlite.connect(file_path.resolve())
+            return file_path
+
+        async def make_db(self):
+            file_path = await self.connect_database()
+            await self.check_table(file_path)
+
+    async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
+        response = await self.check_task(request.task)
+        logger.info("For request '%s' model response is '%s'", request.task, response.content)
+        if response.content.startswith("Да"):
+            return ContractNetProposal(author=str(self.agent_type), request=request, estimate=1.0)
+        else:
+            return None
+
+    @alru_cache(maxsize=128)
+    async def check_task(self, task: str):
+        response = await self.model.ainvoke(
+            f"""У тебя есть агрегированная информация о тратах людей за прошедшие 10 лет на разные 
+            активности. В твоих данных нет деталей когда были траты, есть только общая итоговая сумма.
+            Например, ты можешь найти людей которые в ходят в цирк, но не можешь найти тех,
+            кто ходил в цирк в определенное время или пойдет в будущем. 
+            Относится ли следующий запрос к общим активностям или активностям в конкретное время "{task}"? 
+
+            Ответь Да если речь про общие активности, иначе ответь Нет.""")
+        return response
+
+    async def execute(self, proposal: ContractNetProposal, msg: Message) :
+        thread = await self.default_context.fork_thread()
+        handler = self.RequestBehaviour(thread, self.config, self.default_context.create_chat_model(self.config.model), proposal)
+        self.add_behaviour(handler)
+        await handler.join()
+        if handler.is_done():
+            ret = handler.result
+            await thread.close()
+            return ret
+        else:
+            await thread.close()
+    def create_description(self) -> AgentDescription:
+        return AgentDescription(
+            id="spending_agent",
+            description="""Агент позволяет собрать сегмент людей с определенным профилем трат.
+            Имеет доступ к агрегированным тратам за все время наблюдений.""",
+            tasks=[
+                AgentTask(
+                    description="Найти людей с тратами в определенной категории",
+                    examples=[
+                        "Люди с тратами в магазинах хозтоваров",
+                        "Покупающие продукты на рынках",
+                        "Те, кто платит в ресторанах"
+                    ]),
+                AgentTask(
+                    description="Найти людей c активностями, проявляющимися в тратах",
+                    examples=[
+                        "Люди, которые ходят в бары",
+                        "Часто посещающие кафе",
+                        "Те, кто пользуется автосервисами"
+                    ])
+            ]
+        )
+
+    async def setup_agent(self):
+        await self.register_in_df()
+
+    def setup(self) -> None:
+        asyncio.create_task(self.setup_agent())
+        self.add_behaviour(ContractNetResponderBehavior(self))
+        self.model = self.default_context.create_chat_model(self.config.model)
+
+    async def async_setup(self):
+        await self.register_in_df()
+
+    async def register_in_df(self):
+        context = self.default_context
+        await (context.inform("df").with_content(self.create_description()))
+
+
+class TransactionsAgentConf(BaseModel):
+    data_path: str = Field(description="Path to data files.", default="./data")
+    mcc_expert: str = Field(description="Agent ID of MCC expert.", default="mcc_expert")
+    period_expert: str = Field(description="Agent ID of period expert.", default="period_expert")
+    df_address: str = Field(description="Address of data frame agent.", default="df")
+    model: BaseChatModel = Field(description="Model to use for generating responses.")
+    table_name: str = Field(description="Table name to use for storing agents.", default="transactions")
+
+
+@configuration(TransactionsAgentConf)
+class TransactionsAgent(SpendingProfileAgent):
+    async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
+        return ContractNetProposal(author=str(self.jid), estimate=10, request=request)
+
+    class RequestBehaviour(SpendingProfileAgent.RequestBehaviour):
+
+        async def request_ids(self, mcc: int, thread: str, query: str):
+            response = await self.get_period(query)
+
+            if response == None or Templates.FAILURE().match(response):
+                return []
+            else:
+                period = Period.model_validate_json(response.content)
+                cursor: Cursor = await self.db.execute(
+                    f"""SELECT client_id FROM {self.table_name} 
+                    WHERE mcc={mcc} AND date BETWEEN '{period.start}' AND '{period.end}'
+                    GROUP BY client_id
+                    HAVING sum(amount)>0""")
+                rows = await cursor.fetchall()
+                await cursor.close()
+                return rows
+
+        async def get_period(self, query):
+            period_req = await self.context.fork_thread()
+            await (period_req.request('period_expert').with_content(query))
+
+            receiver = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
+
+            response = receiver.response
+            return response
+
+    def create_description(self) -> AgentDescription:
+        return AgentDescription(
+            id=str(1),
+            description="""Агент позволяет собрать сегмент людей с определенным профилем трат.
+            Имеет доступ к детальным транзакциям за все время наблюдений, способен делать выборки
+            за определенный период.""",
+            tasks=[
+                AgentTask(
+                    description="Найти людей с тратами в определенной категории и период",
+                    examples=[
+                        "Люди с тратами в магазинах хозтоваров в прошлом месяце",
+                        "Покупавшие продукты на рынках в мае 2011-го",
+                        "Те, кто платил в ресторанах в этот месяц в прошлом году"
+                    ]),
+                AgentTask(
+                    description="Найти людей c активностями, проявляющимися в тратах в определенном периоде",
+                    examples=[
+                        "Люди, которые ходили в бар на прошлой неделе",
+                        "Часто посещавшие кафе в прошлый вторник",
+                        "Те, кто пользовался автосервисами вчера"
+                    ])
+            ]
+        )

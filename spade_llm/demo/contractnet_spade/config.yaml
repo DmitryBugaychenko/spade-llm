@@ -1,0 +1,41 @@
+# Configuration of the messaging system. For demo internal in-memory messaging is used
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+# Configuration of the agent state storage. For demo internal in-memory storage is used
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+chat_models:
+  max:
+    type_name: spade_llm.models.gigachat.GigaChatModelFactory
+    args:
+      credentials: env.GIGA_CRED
+      model: GigaChat-2-Max
+      verify_ssl_certs: False
+  lite:
+    type_name: spade_llm.models.gigachat.GigaChatModelFactory
+    args:
+      credentials: env.GIGA_CRED
+      model: GigaChat-2
+      verify_ssl_certs: False
+# Agents to host in the system
+agents:
+  # Console agent which listens for commands from console and sends them to the delegate agent
+  chat:
+    type_name: spade_llm.demo.contractnet_spade.agents.ChatAgent
+  mcc_expert:
+    type_name: spade_llm.demo.contractnet_spade.agents.MccExpertAgent
+    args:
+      model: max
+  period_expert:
+    type_name: spade_llm.demo.contractnet_spade.agents.PeriodExpertAgent
+    args:
+      model: max
+      date: 2012-01-01
+  spending_agent:
+    type_name: spade_llm.demo.contractnet_spade.agents.SpendingProfileAgent
+    args:
+      model: max
+  df:
+    type_name: spade_llm.discovery_platform.DirectoryFacilitatorAgent
+# Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
+wait_for_agents: [chat]
