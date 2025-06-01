@@ -1,4 +1,4 @@
-# Contract Net Demo
+# Contract Net Demo (spade_llm platform)
 
 This demo shows how agent links might be established in dynamics using two concepts:
 1. [Discovery Service](https://ieeexplore.ieee.org/document/4624020) (DF) - a special agent used to search for other agents. It allows others to register in a directory providing description and list of tasks they can handle with examples. Then it allows to search for registered agents. In contrast with traditional DF based on full-text matching and ontologies this one uses vector store and embedings.
@@ -36,7 +36,7 @@ export GIGACHAT_SCOPE=<your API version>
 Run the demo
 
 ```shell
-python -m spade_llm.demo.contractnet.main ./data
+python -m spade_llm.boot ./spade_llm/demo/contractnet_spade/config.yaml
 ```
 
 This demo uses MCC codes and agents description in russian, tested on tasks "Люди, которые ходят в бары" и "Люди, которые ходили в бар в прошлом месяце". 
