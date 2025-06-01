@@ -42,4 +42,4 @@ agents:
   df:
     type_name: spade_llm.discovery_platform.DirectoryFacilitatorAgent
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
-wait_for_agents: [chat]
+wait_for_agents: [ chat ]
