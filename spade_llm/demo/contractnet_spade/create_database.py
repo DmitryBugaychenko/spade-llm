@@ -1,6 +1,5 @@
 import sqlite3
 import sys
-
 import numpy as np
 import pandas
 

@@ -1,4 +1,4 @@
-# Contract Net Demo
+# Contract Net Demo (spade_llm platform)
 
 This demo shows how agent links might be established in dynamics using two concepts:
 1. [Discovery Service](https://ieeexplore.ieee.org/document/4624020) (DF) - a special agent used to search for other agents. It allows others to register in a directory providing description and list of tasks they can handle with examples. Then it allows to search for registered agents. In contrast with traditional DF based on full-text matching and ontologies this one uses vector store and embedings.
