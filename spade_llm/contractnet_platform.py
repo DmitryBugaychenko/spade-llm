@@ -89,6 +89,7 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
         self.time_to_wait_for_proposals = time_to_wait_for_proposals
         self.df_address = df_address
         self.task = task
+        self.result = None
 
     async def on_start(self) -> None:
         self._started_at = time.time()
@@ -180,4 +181,3 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
 
         await thread.close()
         return reply
-

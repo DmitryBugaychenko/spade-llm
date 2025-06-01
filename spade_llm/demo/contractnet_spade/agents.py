@@ -233,7 +233,8 @@ class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
             return response
 
     def setup(self) -> None:
-        self.add_behaviour(self.RequestBehaviour(self.config,model=self.default_context.create_chat_model(self.config.model)))
+        self.add_behaviour(
+            self.RequestBehaviour(self.config, model=self.default_context.create_chat_model(self.config.model)))
 
 
 class SpendingProfileAgentConf(BaseModel):
@@ -250,7 +251,8 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
         super().__init__(*args, **kwargs)
 
     class RequestBehaviour(ContextBehaviour):
-        def __init__(self, context: AgentContext, config: SpendingProfileAgentConf, model: BaseChatModel, db: Connection, request):
+        def __init__(self, context: AgentContext, config: SpendingProfileAgentConf, model: BaseChatModel,
+                     db: Connection, request):
             super().__init__(context)
             self.db = db
             self.model = model
@@ -331,9 +333,10 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
             Ответь Да если речь про общие активности, иначе ответь Нет.""")
         return response
 
-    async def execute(self, proposal: ContractNetProposal, msg: Message) :
+    async def execute(self, proposal: ContractNetProposal, msg: Message):
         thread = await self.default_context.fork_thread()
-        handler = self.RequestBehaviour(thread, self.config, self.default_context.create_chat_model(self.config.model),self.db, proposal)
+        handler = self.RequestBehaviour(thread, self.config, self.default_context.create_chat_model(self.config.model),
+                                        self.db, proposal)
         self.add_behaviour(handler)
         await handler.join()
         if handler.is_done():
@@ -342,6 +345,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
             return ret
         else:
             await thread.close()
+
     def create_description(self) -> AgentDescription:
         return AgentDescription(
             id="spending_agent",
@@ -394,11 +398,29 @@ class TransactionsAgentConf(BaseModel):
 @configuration(TransactionsAgentConf)
 class TransactionsAgent(SpendingProfileAgent):
     async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
-        return ContractNetProposal(author=self.agent_type, estimate=10, request=request)
+        response = await self.check_task(request.task)
+        logger.info("For request '%s' model response is '%s'", request.task, response.content)
+        if response.content.startswith("Да"):
+            return ContractNetProposal(author=self.agent_type, estimate=10, request=request)
+        else:
+            return None
 
+    @alru_cache(maxsize=128)
+    async def check_task(self, task: str):
+        response = await self.model.ainvoke(
+            f"""У тебя есть агрегированная информация о тратах людей за прошедшие 10 лет (до сегодняшнего дня) на разные 
+            активности. В твоих данных есть детали когда были траты.
+            Например, ты можешь найти людей которые в ходят в цирк, 
+            или ходят в цирк конкретно весной, но не можешь найти тех,
+            кто ходил в цирк в периоды времени, которые нельзя представить в виде одного промежутка времени, 
+            и ты не можешь найти тех, кто пойдет в будущем. 
+            Можно ли ответить на следующий запрос, имея детали о времени трат "{task}"? 
+
+            Ответь Да если можно, иначе ответь Нет.""")
+        return response
     class RequestBehaviour(SpendingProfileAgent.RequestBehaviour):
 
-        async def request_ids(self, mcc: int,  query: str):
+        async def request_ids(self, mcc: int, query: str):
             msg = await self.get_period(query)
             if not msg or msg.performative == consts.FAILURE:
                 return []
