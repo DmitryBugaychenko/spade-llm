@@ -70,8 +70,8 @@ class ChatAgent(Agent, Configurable[ChatAgentConf]):
 
         async def step(self) -> None:
             # Small hack to let all the logs to be printed before prompting
-            await asleep(0.5)
-            print(ChatAgent.cformat("Введите сообщение для бота: "))
+            await asleep(2)
+            print(ChatAgent.cformat("\nВведите сообщение для бота: "))
             user_input: str = await ainput(ChatAgent.cformat("Какой сегмент собрать: "))
 
             if user_input.lower() in {"пока", "bye"}:
@@ -140,6 +140,7 @@ class MccExpertAgent(Agent, Configurable[MccExpertAgentConf]):
         async def find_mcc(self, query: str):
             logger.info("Extracting code for segment description %s", query)
             chain = self.model | self.parser
+            await asleep(0.5)
             request: MccDescription = await chain.ainvoke(
                 await self.prepare_request_prompt.ainvoke(
                     {"query": query,
@@ -216,10 +217,14 @@ class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
             if msg:
                 query = msg.content
                 response = await self.get_period(query)
-                await self.context.reply_with_inform(msg).with_content(response)
+                if not response or not response.start or not response.end:
+                    await self.context.reply_with_failure(msg).with_content('failed to get period')
+                else:
+                    await self.context.reply_with_inform(msg).with_content(response)
 
         @alru_cache(maxsize=1024)
         async def get_period(self, query: str) -> Period:
+            await asyncio.sleep(1)
             request = await self.get_period_prompt.ainvoke(
                 {
                     "query": query,
@@ -228,7 +233,6 @@ class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
                 }
             )
             chain = self.model | self.parser
-            await asyncio.sleep(1.5)
             response: Period = await chain.ainvoke(request)
             return response
 
@@ -370,6 +374,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
         )
 
     async def setup_agent(self):
+        await asleep(0.5)
         await self.register_in_df()
 
     def setup(self) -> None:
@@ -393,6 +398,7 @@ class TransactionsAgentConf(BaseModel):
     df_address: str = Field(description="Address of data frame agent.", default="df")
     model: str = Field(description="Model to use for generating responses.")
     table_name: str = Field(description="Table name to use for storing agents.", default="transactions")
+    date: str = Field(description="Current date.", default="2012-01-01")
 
 
 @configuration(TransactionsAgentConf)
@@ -407,17 +413,21 @@ class TransactionsAgent(SpendingProfileAgent):
 
     @alru_cache(maxsize=128)
     async def check_task(self, task: str):
+        await asleep(0.3)
         response = await self.model.ainvoke(
-            f"""У тебя есть агрегированная информация о тратах людей за прошедшие 10 лет (до сегодняшнего дня) на разные 
-            активности. В твоих данных есть детали когда были траты.
+            f"""Сегодняшний день это {self.config.date}.
+            У тебя есть агрегированная информация о тратах людей на разные активности за прошедшие 10 лет до сегодняшнего дня.
+            В твоих данных есть детали когда были траты.
             Например, ты можешь найти людей которые в ходят в цирк, 
-            или ходят в цирк конкретно весной, но не можешь найти тех,
+            или ходят в цирк конкретно весной, или тех кто ходил в цирк на прошлой неделе,
+            но не можешь найти тех,
             кто ходил в цирк в периоды времени, которые нельзя представить в виде одного промежутка времени, 
             и ты не можешь найти тех, кто пойдет в будущем. 
             Можно ли ответить на следующий запрос, имея детали о времени трат "{task}"? 
 
-            Ответь Да если можно, иначе ответь Нет.""")
+            Ответь одним словом Да если можно, иначе ответь Нет.""")
         return response
+
     class RequestBehaviour(SpendingProfileAgent.RequestBehaviour):
 
         async def request_ids(self, mcc: int, query: str):
