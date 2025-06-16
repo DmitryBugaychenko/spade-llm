@@ -6,7 +6,8 @@ from spade_llm import consts
 from pydantic import BaseModel, Field
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.core.api import AgentContext
-from spade_llm.demo.platform.contractnet_spade.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest
+from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest, \
+    DF_ADRESS
 from spade_llm.core.api import Message
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,6 @@ class ContractNetResponderBehavior(MessageHandlingBehavior):
 
 class ContractNetInitiatorBehavior(ContextBehaviour):
     task: str
-    df_address: str
     proposal: Optional[ContractNetProposal] = None
     result: Optional[MessageTemplate]
     time_to_wait_for_proposals: float
@@ -77,12 +77,12 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
 
     def __init__(self,
                  task: str,
-                 df_address: str,
                  context: AgentContext,
-                 time_to_wait_for_proposals: float = 10):
+                 time_to_wait_for_proposals: float = 10,
+                 time_to_wait_for_result: float = 20):
         super().__init__(context)
         self.time_to_wait_for_proposals = time_to_wait_for_proposals
-        self.df_address = df_address
+        self.time_to_wait_for_result = time_to_wait_for_result
         self.task = task
         self.result = None
 
@@ -119,20 +119,18 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
         self.set_is_done()
 
     async def find_agents(self, task: str) -> list[AgentDescription]:
-        thread = await self.context.fork_thread()
-        await (thread
-               .request("df")
+        await (self.context
+               .request(DF_ADRESS)
                .with_content(AgentSearchRequest(task=task, top_k=10)))
 
-        search = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
-        if not search:
-            print(f"No search recieved in {10} seconds")
+        search = await self.receive(MessageTemplate(performative=consts.INFORM, thread_id=self.context.thread_id),
+                                    timeout=10)
 
-        await thread.close()
-        if search and search.performative == consts.INFORM:
+        if search:
             parsed = AgentSearchResponse.model_validate_json(search.content)
             return parsed.agents
         else:
+            logger.error(f"No search recieved in {10} seconds")
             return list()
 
     async def get_proposals(self, agents: list[AgentDescription]) -> list[ContractNetProposal]:
@@ -143,19 +141,17 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
         request = ContractNetRequest(task=self.task)
         for agent in agents:
             sent.add(agent.id)
-            thread = await self.context.fork_thread()
-            await (thread.request_proposal(agent.id).with_content(request))
-            await thread.close()
+            await (self.context.request_proposal(agent.id).with_content(request))
         started = time.time()
 
         deadline = started + self.time_to_wait_for_proposals
         while len(received) < len(sent) and time.time() < deadline:
-            response = await self.receive(MessageTemplate(thread_id=self.context.thread_id),
-                                          max(0.1, deadline - time.time()))
+            response = await self.receive(
+                MessageTemplate(performative=consts.PROPOSE, thread_id=self.context.thread_id),
+                max(0.1, deadline - time.time()))
             if response:
                 received.add(str(response.sender))
-                if response.performative == consts.PROPOSE:
-                    result.append(ContractNetProposal.model_validate_json(response.content))
+                result.append(ContractNetProposal.model_validate_json(response.content))
 
         return result
 
@@ -172,7 +168,9 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
         thread = await self.context.fork_thread()
 
         await thread.accept(proposal.author).with_content(proposal)
-        reply = await self.receive(MessageTemplate(thread_id=thread.thread_id), 20)
+        reply = await self.receive(MessageTemplate(performative=consts.INFORM, thread_id=thread.thread_id,
+                                                   validator=MessageTemplate.from_agent(proposal.author)),
+                                   self.time_to_wait_for_result)
 
         await thread.close()
         return reply
