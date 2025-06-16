@@ -21,25 +21,25 @@ chat_models:
 agents:
   # Console agent which listens for commands from console and sends them to the delegate agent
   chat:
-    type_name: spade_llm.demo.contractnet_spade.agents.ChatAgent
+    type_name: spade_llm.demo.platform.contractnet_spade.agents.ChatAgent
   mcc_expert:
-    type_name: spade_llm.demo.contractnet_spade.agents.MccExpertAgent
+    type_name: spade_llm.demo.platform.contractnet_spade.agents.MccExpertAgent
     args:
       model: max
   period_expert:
-    type_name: spade_llm.demo.contractnet_spade.agents.PeriodExpertAgent
+    type_name: spade_llm.demo.platform.contractnet_spade.agents.PeriodExpertAgent
     args:
       model: max
       date: 2012-01-01
   spending_agent:
-    type_name: spade_llm.demo.contractnet_spade.agents.SpendingProfileAgent
+    type_name: spade_llm.demo.platform.contractnet_spade.agents.SpendingProfileAgent
     args:
       model: max
   transaction_agent:
-    type_name: spade_llm.demo.contractnet_spade.agents.TransactionsAgent
+    type_name: spade_llm.demo.platform.contractnet_spade.agents.TransactionsAgent
     args:
       model: max
   df:
-    type_name: spade_llm.discovery_platform.DirectoryFacilitatorAgent
+    type_name: spade_llm.demo.platform.contractnet_spade.discovery.DirectoryFacilitatorAgent
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
 wait_for_agents: [ chat ]

@@ -7,7 +7,7 @@ from typing import Optional
 from asyncio import sleep as asleep
 import asyncio
 import aiosqlite
-from spade_llm.core.api import AgentId, AgentContext
+from spade_llm.core.api import AgentContext
 from aioconsole import ainput
 from aiosqlite import Cursor, Connection
 from async_lru import alru_cache
@@ -23,9 +23,9 @@ from pydantic.fields import Field
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.core.api import Message
-from spade_llm.contractnet_platform import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
+from spade_llm.demo.platform.contractnet_spade.contractnet import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
     ContractNetResponderBehavior, ContractNetInitiatorBehavior
-from spade_llm.discovery_platform import AgentDescription, AgentTask
+from spade_llm.demo.platform.contractnet_spade.discovery import AgentDescription, AgentTask
 from spade_llm.core.conf import configuration, Configurable
 from spade_llm.demo import models
 from spade_llm import consts

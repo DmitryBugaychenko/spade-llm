@@ -1,14 +1,12 @@
 import logging
 import time
-import uuid
-from asyncio import sleep as asleep
 from abc import ABC, abstractmethod
 from typing import Optional
 from spade_llm import consts
 from pydantic import BaseModel, Field
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
-from spade_llm.core.api import AgentId, AgentContext
-from spade_llm.discovery_platform import AgentDescription, AgentSearchResponse, AgentSearchRequest
+from spade_llm.core.api import AgentContext
+from spade_llm.demo.platform.contractnet_spade.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest
 from spade_llm.core.api import Message
 
 logger = logging.getLogger(__name__)
@@ -76,16 +74,13 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
     result: Optional[MessageTemplate]
     time_to_wait_for_proposals: float
     _started_at: float
-    thread: str
 
     def __init__(self,
                  task: str,
                  df_address: str,
                  context: AgentContext,
-                 thread: str = str(uuid.uuid4()),
                  time_to_wait_for_proposals: float = 10):
         super().__init__(context)
-        self.thread = thread
         self.time_to_wait_for_proposals = time_to_wait_for_proposals
         self.df_address = df_address
         self.task = task
