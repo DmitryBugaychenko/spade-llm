@@ -23,9 +23,9 @@ from pydantic.fields import Field
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.core.api import Message
-from spade_llm.demo.platform.contractnet_spade.contractnet import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
+from spade_llm.demo.platform.contractnet.contractnet import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
     ContractNetResponderBehavior, ContractNetInitiatorBehavior
-from spade_llm.demo.platform.contractnet_spade.discovery import AgentDescription, AgentTask
+from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentTask
 from spade_llm.core.conf import configuration, Configurable
 from spade_llm.demo import models
 from spade_llm import consts
@@ -80,7 +80,6 @@ class ChatAgent(Agent, Configurable[ChatAgentConf]):
 
             request = ContractNetInitiatorBehavior(
                 task=user_input,
-                df_address='df',
                 context=self.context,
                 time_to_wait_for_proposals=10
             )
@@ -225,6 +224,7 @@ class PeriodExpertAgent(Agent, Configurable[PeriodExpertAgentConf]):
         @alru_cache(maxsize=1024)
         async def get_period(self, query: str) -> Period:
             await asyncio.sleep(1)
+            logger.info("Extracting period for query %s", query)
             request = await self.get_period_prompt.ainvoke(
                 {
                     "query": query,
@@ -245,7 +245,6 @@ class SpendingProfileAgentConf(BaseModel):
     data_path: str = Field(description="Path to data files.", default="./data")
     table_name: str = Field(description="Table name to use for storing agents.", default="spendings")
     mcc_expert: str = Field(description="Agent ID of MCC expert.", default="mcc_expert")
-    df_address: str = Field(description="Address of data frame agent.", default="df_agent")
     model: str = Field(description="Model to use for generating responses.")
 
 
@@ -395,7 +394,6 @@ class TransactionsAgentConf(BaseModel):
     data_path: str = Field(description="Path to data files.", default="./data")
     mcc_expert: str = Field(description="Agent ID of MCC expert.", default="mcc_expert")
     period_expert: str = Field(description="Agent ID of period expert.", default="period_expert")
-    df_address: str = Field(description="Address of data frame agent.", default="df")
     model: str = Field(description="Model to use for generating responses.")
     table_name: str = Field(description="Table name to use for storing agents.", default="transactions")
     date: str = Field(description="Current date.", default="2012-01-01")

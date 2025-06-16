@@ -11,35 +11,29 @@ chat_models:
       credentials: env.GIGA_CRED
       model: GigaChat-2-Max
       verify_ssl_certs: False
-  lite:
-    type_name: spade_llm.models.gigachat.GigaChatModelFactory
-    args:
-      credentials: env.GIGA_CRED
-      model: GigaChat-2
-      verify_ssl_certs: False
 # Agents to host in the system
 agents:
   # Console agent which listens for commands from console and sends them to the delegate agent
   chat:
-    type_name: spade_llm.demo.platform.contractnet_spade.agents.ChatAgent
+    type_name: spade_llm.demo.platform.contractnet.agents.ChatAgent
   mcc_expert:
-    type_name: spade_llm.demo.platform.contractnet_spade.agents.MccExpertAgent
+    type_name: spade_llm.demo.platform.contractnet.agents.MccExpertAgent
     args:
       model: max
   period_expert:
-    type_name: spade_llm.demo.platform.contractnet_spade.agents.PeriodExpertAgent
+    type_name: spade_llm.demo.platform.contractnet.agents.PeriodExpertAgent
     args:
       model: max
       date: 2012-01-01
   spending_agent:
-    type_name: spade_llm.demo.platform.contractnet_spade.agents.SpendingProfileAgent
+    type_name: spade_llm.demo.platform.contractnet.agents.SpendingProfileAgent
     args:
       model: max
   transaction_agent:
-    type_name: spade_llm.demo.platform.contractnet_spade.agents.TransactionsAgent
+    type_name: spade_llm.demo.platform.contractnet.agents.TransactionsAgent
     args:
       model: max
   df:
-    type_name: spade_llm.demo.platform.contractnet_spade.discovery.DirectoryFacilitatorAgent
+    type_name: spade_llm.demo.platform.contractnet.discovery.DirectoryFacilitatorAgent
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
 wait_for_agents: [ chat ]

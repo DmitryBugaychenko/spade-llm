@@ -20,7 +20,7 @@ Download data from [financial transactions dataset](https://www.kaggle.com/datas
 Create a SQLite database for the demo%
 
 ```shell
-python ./spade_llm/demo/contractnet/create_database.py ./data
+python ./spade_llm/demo/platform/contractnet/create_database.py ./data
 ```
 
 Configure GigaChat credentials. Follow [instruction](https://developers.sber.ru/docs/ru/gigachat/individuals-quickstart)
@@ -36,7 +36,7 @@ export GIGACHAT_SCOPE=<your API version>
 Run the demo
 
 ```shell
-python -m spade_llm.boot ./spade_llm/demo/contractnet_spade/config.yaml
+python -m spade_llm.boot ./spade_llm/demo/platform/contractnet/config.yaml
 ```
 
 This demo uses MCC codes and agents description in russian, tested on tasks "Люди, которые ходят в бары" и "Люди, которые ходили в бар в прошлом месяце". 
