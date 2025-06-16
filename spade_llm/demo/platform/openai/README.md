@@ -1,6 +1,5 @@
 # REACT agent with Wiki tool (Based on openai ChatGPT-4o)
-
-This is a simple demo of LLM agent with single tool for Wikipedia search.
+This demo demonstrates how to use OpenAI-compatible models with spade_llm
 
 To run the demo open a terminal at the root of the GitHub project and follow the steps below.
 
