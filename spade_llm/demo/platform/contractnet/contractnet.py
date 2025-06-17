@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.core.api import AgentContext
 from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest, \
-    DF_ADRESS
+    DF_ADDRESS
 from spade_llm.core.api import Message
 
 logger = logging.getLogger(__name__)
@@ -40,18 +40,20 @@ class ContractNetResponderBehavior(MessageHandlingBehavior):
         super().__init__(MessageTemplate.request_proposal())
         self._responder = responder
 
-    class AcceptBehavior(MessageHandlingBehavior):
-        def __init__(self, responder: ContractNetResponder, proposal):
-            super().__init__(MessageTemplate.accept())
+    class HandleAcceptBehavior(ContextBehaviour):
+        def __init__(self, context:AgentContext,responder: ContractNetResponder, proposal):
+            super().__init__(context)
             self._responder = responder
             self.proposal = proposal
 
         async def step(self) -> None:
-            msg = self.message
+            msg = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
             if msg and msg.performative == consts.ACCEPT:
                 result = await(self._responder.execute(self.proposal, msg))
                 await self.context.reply_with_inform(msg).with_content(result)
-                self.set_is_done()
+            elif msg and msg.performative == consts.REFUSE:
+                pass
+            self.set_is_done()
 
     async def step(self) -> None:
         if self.message:
@@ -60,13 +62,12 @@ class ContractNetResponderBehavior(MessageHandlingBehavior):
             proposal = await self._responder.estimate(parsed_request, msg)
             if proposal:
                 await self.context.reply_with_propose(msg).with_content(proposal)
-                handler = self.AcceptBehavior(self._responder, proposal)
+                handler = self.HandleAcceptBehavior(self.context,self._responder, proposal)
                 self.agent.add_behaviour(handler)
                 await handler.join()
 
             else:
                 await self.context.reply_with_refuse(msg).with_content("")
-
 
 class ContractNetInitiatorBehavior(ContextBehaviour):
     task: str
@@ -108,8 +109,11 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
                 logger.info("Best proposal for task '%s' is %s", self.task, self.proposal)
                 if self.proposal:
                     self.result = await self.get_result(self.proposal)
-                    to_log = str(self.result.content)
-                    logger.info("Result for task '%s' is %s", self.task, to_log[0:min(256, len(to_log))])
+                    if self.result:
+                        to_log = str(self.result.content)
+                        logger.info("Result for task '%s' is %s", self.task, to_log[0:min(256, len(to_log))])
+                    else:
+                        logger.error("Failed to get result for task '%s'", self.task)
                 else:
                     logger.error("Failed to select best proposal for '%s'", self.task)
             else:
@@ -120,7 +124,7 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
 
     async def find_agents(self, task: str) -> list[AgentDescription]:
         await (self.context
-               .request(DF_ADRESS)
+               .request(DF_ADDRESS)
                .with_content(AgentSearchRequest(task=task, top_k=10)))
 
         search = await self.receive(MessageTemplate(performative=consts.INFORM, thread_id=self.context.thread_id),
@@ -165,12 +169,9 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
         return winner
 
     async def get_result(self, proposal: ContractNetProposal) -> Optional[MessageTemplate]:
-        thread = await self.context.fork_thread()
-
-        await thread.accept(proposal.author).with_content(proposal)
-        reply = await self.receive(MessageTemplate(performative=consts.INFORM, thread_id=thread.thread_id,
+        await self.context.accept(proposal.author).with_content(proposal)
+        reply = await self.receive(MessageTemplate(performative=consts.INFORM, thread_id=self.context.thread_id,
                                                    validator=MessageTemplate.from_agent(proposal.author)),
                                    self.time_to_wait_for_result)
 
-        await thread.close()
         return reply

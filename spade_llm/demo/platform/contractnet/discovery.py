@@ -15,7 +15,7 @@ from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
 from spade_llm.core.conf import configuration, Configurable
 
 _ID_SEPARATOR = "/"
-DF_ADRESS = "df"
+DF_ADDRESS = "df"
 logger = logging.getLogger(__name__)
 
 

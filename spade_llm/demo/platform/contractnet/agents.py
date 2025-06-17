@@ -26,7 +26,7 @@ from spade_llm.core.api import Message
 from spade_llm.demo.platform.contractnet.contractnet import ContractNetResponder, ContractNetRequest, \
     ContractNetProposal, \
     ContractNetResponderBehavior, ContractNetInitiatorBehavior
-from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentTask
+from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentTask, DF_ADDRESS
 from spade_llm.core.conf import configuration, Configurable
 from spade_llm.demo import models
 from spade_llm import consts
@@ -54,7 +54,7 @@ class MccExpertAgentConf(BaseModel):
 
 
 class SegmentAssemblerAgentConf(BaseModel):
-    msg: str = Field(default="Hello World!", description="Сообщение для отправки")
+    pass
 
 
 @configuration(SegmentAssemblerAgentConf)
@@ -63,6 +63,7 @@ class SegmentAssemblerAgent(Agent, Configurable[SegmentAssemblerAgentConf]):
     def cformat(msg: str) -> str:
         """Utility for getting more visible messages in console"""
         return "\033[1m\033[92m{}\033[00m\033[00m".format(msg)
+
     class SegmentRequestBehaviour(MessageHandlingBehavior):
         def __init__(self, config: SegmentAssemblerAgentConf):
             super().__init__(MessageTemplate.request())
@@ -81,7 +82,7 @@ class SegmentAssemblerAgent(Agent, Configurable[SegmentAssemblerAgentConf]):
                 result = UsersList.model_validate_json(request.result.content)
                 head = ",".join([str(id) for id in result.ids[0:min(20, len(result.ids))]])
                 await self.context.reply_with_inform(self.message).with_content(SegmentAssemblerAgent.cformat(
-                    f"Получен сегмент:\nРазмер {len(result.ids)} ") +f"Первые 20 ids: {head}")
+                    f"Получен сегмент:\nРазмер {len(result.ids)} ") + f"Первые 20 ids: {head}")
             else:
                 await self.context.reply_with_failure(self.message).with_content(SegmentAssemblerAgent.cformat(
                     f"Не удалось собрать сегмент."))
@@ -279,7 +280,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
             return rows
 
         async def get_mcc(self, task: str):
-            await (self.context.request('mcc_expert').with_content(task))
+            await (self.context.request(self.config.mcc_expert).with_content(task))
             receiver = await self.receive(MessageTemplate(self.context.thread_id), timeout=20)
             return receiver
 
@@ -378,7 +379,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
 
     async def register_in_df(self):
         context = self.default_context
-        await (context.inform("df").with_content(self.create_description()))
+        await (context.inform(DF_ADDRESS).with_content(self.create_description()))
 
 
 class TransactionsAgentConf(BaseModel):
@@ -435,7 +436,7 @@ class TransactionsAgent(SpendingProfileAgent):
                 return rows
 
         async def get_period(self, query):
-            await (self.context.request('period_expert').with_content(query))
+            await (self.context.request(self.config.period_expert).with_content(query))
             response = await self.receive(MessageTemplate(thread_id=self.context.thread_id), timeout=10)
             return response
 
