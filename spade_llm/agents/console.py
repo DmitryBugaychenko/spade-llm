@@ -66,8 +66,8 @@ class InputBehavior(ContextBehaviour):
 
     async def step(self):
         # Small hack to let all the logs to be printed before prompting
-        await asleep(0.5)
-        user_input = await ainput(self.config.prompt)
+        await asleep(5.5)
+        user_input = await ainput(ConsoleAgent.cformat(self.config.prompt))
         if user_input.lower() in self.config.stop_words:
             self.agent.stop()
             self.set_is_done()
@@ -85,6 +85,9 @@ class InputBehavior(ContextBehaviour):
 
 @configuration(ConsoleAgentConf)
 class ConsoleAgent(Agent, Configurable[ConsoleAgentConf]):
-
+    @staticmethod
+    def cformat(msg: str) -> str:
+        """Utility for getting more visible messages in console"""
+        return "\033[1m\033[92m{}\033[00m\033[00m".format(msg)
     def setup(self):
         self.add_behaviour(InputBehavior(self.default_context, self.config))

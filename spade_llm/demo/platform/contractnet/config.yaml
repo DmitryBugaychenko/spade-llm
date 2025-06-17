@@ -15,8 +15,8 @@ chat_models:
 # Agents to host in the system
 agents:
   # Console agent which listens for commands from console and sends them to the delegate agent
-  chat:
-    type_name: spade_llm.demo.platform.contractnet.agents.ChatAgent
+  segment_assembler:
+    type_name: spade_llm.demo.platform.contractnet.agents.SegmentAssemblerAgent
   mcc_expert:
     type_name: spade_llm.demo.platform.contractnet.agents.MccExpertAgent
     args:
@@ -34,7 +34,13 @@ agents:
     type_name: spade_llm.demo.platform.contractnet.agents.TransactionsAgent
     args:
       model: max
+  # Console agent which listens for commands from console and sends them to the delegate agent
+  console:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: segment_assembler
+      prompt: Какой сегмент собрать?
   df:
     type_name: spade_llm.demo.platform.contractnet.discovery.DirectoryFacilitatorAgent
 # Agents to wait for before stopping the system. The system stops when all agents from this list are stopped.
-wait_for_agents: [ chat ]
+wait_for_agents: [ console ]

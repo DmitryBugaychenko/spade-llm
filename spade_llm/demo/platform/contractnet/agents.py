@@ -23,7 +23,8 @@ from pydantic.fields import Field
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.core.api import Message
-from spade_llm.demo.platform.contractnet.contractnet import ContractNetResponder, ContractNetRequest, ContractNetProposal, \
+from spade_llm.demo.platform.contractnet.contractnet import ContractNetResponder, ContractNetRequest, \
+    ContractNetProposal, \
     ContractNetResponderBehavior, ContractNetInitiatorBehavior
 from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentTask
 from spade_llm.core.conf import configuration, Configurable
@@ -52,51 +53,41 @@ class MccExpertAgentConf(BaseModel):
     data_path: str = Field(description="Path to data files.", default="./data")
 
 
-class ChatAgentConf(BaseModel):
+class SegmentAssemblerAgentConf(BaseModel):
     msg: str = Field(default="Hello World!", description="Сообщение для отправки")
 
 
-@configuration(ChatAgentConf)
-class ChatAgent(Agent, Configurable[ChatAgentConf]):
+@configuration(SegmentAssemblerAgentConf)
+class SegmentAssemblerAgent(Agent, Configurable[SegmentAssemblerAgentConf]):
     @staticmethod
     def cformat(msg: str) -> str:
         """Utility for getting more visible messages in console"""
         return "\033[1m\033[92m{}\033[00m\033[00m".format(msg)
-
-    class ChatBehaviour(ContextBehaviour):
-        def __init__(self, context: AgentContext, config: ChatAgentConf):
-            super().__init__(context)
+    class SegmentRequestBehaviour(MessageHandlingBehavior):
+        def __init__(self, config: SegmentAssemblerAgentConf):
+            super().__init__(MessageTemplate.request())
             self.config = config
 
         async def step(self) -> None:
-            # Small hack to let all the logs to be printed before prompting
-            await asleep(2)
-            print(ChatAgent.cformat("\nВведите сообщение для бота: "))
-            user_input: str = await ainput(ChatAgent.cformat("Какой сегмент собрать: "))
-
-            if user_input.lower() in {"пока", "bye"}:
-                await self.agent.stop()
-                return None
-
             request = ContractNetInitiatorBehavior(
-                task=user_input,
+                task=self.message.content,
                 context=self.context,
                 time_to_wait_for_proposals=10
             )
 
             self.agent.add_behaviour(request)
             await request.join()
-            # Small hack to let all the logs to be printed before prompting
             if request.is_successful:
-                print(ChatAgent.cformat("Получен ответ: ") + request.result.content)
                 result = UsersList.model_validate_json(request.result.content)
                 head = ",".join([str(id) for id in result.ids[0:min(20, len(result.ids))]])
-                print(ChatAgent.cformat("Получен сегмент: ") + f"Размер {len(result.ids)} первые 20 ids: {head}")
+                await self.context.reply_with_inform(self.message).with_content(SegmentAssemblerAgent.cformat(
+                    f"Получен сегмент:\nРазмер {len(result.ids)} ") +f"Первые 20 ids: {head}")
             else:
-                print(ChatAgent.cformat("Не удалось собрать сегмент."))
+                await self.context.reply_with_failure(self.message).with_content(SegmentAssemblerAgent.cformat(
+                    f"Не удалось собрать сегмент."))
 
     def setup(self):
-        self.add_behaviour(self.ChatBehaviour(self.default_context, self.config))
+        self.add_behaviour(self.SegmentRequestBehaviour(self.config))
 
 
 @configuration(MccExpertAgentConf)
