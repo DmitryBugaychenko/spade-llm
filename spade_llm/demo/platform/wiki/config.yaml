@@ -10,6 +10,7 @@ chat_models:
     type_name: spade_llm.models.gigachat.GigaChatModelFactory
     args:
       credentials: env.GIGA_CRED
+      scope: env.GIGACHAT_SCOPE
       model: GigaChat-2
       verify_ssl_certs: False
 
@@ -41,10 +42,10 @@ agents:
       # Model to use
       model: giga
     # Tools available to the agent
-    tools: [wikipedia]
+    tools: [ wikipedia ]
   # Console agent which listens for commands from console and sends them to the delegate agent
   console:
     type_name: spade_llm.agents.console.ConsoleAgent
     args:
       delegate_type: react
-wait_for_agents: [console]
+wait_for_agents: [ console ]

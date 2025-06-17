@@ -9,6 +9,7 @@ chat_models:
     type_name: spade_llm.models.gigachat.GigaChatModelFactory
     args:
       credentials: env.GIGA_CRED
+      scope: env.GIGACHAT_SCOPE
       model: GigaChat-2-Max
       verify_ssl_certs: False
 # Agents to host in the system

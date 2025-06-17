@@ -4,7 +4,7 @@ from langchain_gigachat.chat_models import GigaChat
 from spade_llm.core.conf import configuration, Configurable
 from spade_llm.core.models import ChatModelFactory, EmbeddingsModelFactory, CredentialsUtils
 
-SENSITIVE_KEYS = ["access_token", "password", "key_file_password", "credentials"]
+SENSITIVE_KEYS = ["access_token", "password", "key_file_password", "credentials", "scope"]
 
 
 class GigaChatWithExtra(GigaChat, extra="ignore"):
@@ -16,13 +16,10 @@ class GigaChatModelFactory(ChatModelFactory[GigaChat], Configurable[GigaChatWith
 
     def create_model(self) -> GigaChat:
         config = self.config
-        chat_scope = "GIGACHAT_API_PERS" if not CredentialsUtils.inject_env(
-            "env.GIGACHAT_SCOPE") else CredentialsUtils.inject_env("env.GIGACHAT_SCOPE")
 
         config_dict = CredentialsUtils.inject_env_dict(
             keys=SENSITIVE_KEYS,
-            conf=config.model_dump(exclude_none=True),
-            extra_params={'scope': chat_scope}
+            conf=config.model_dump(exclude_none=True)
         )
 
         return GigaChat(**config_dict)
