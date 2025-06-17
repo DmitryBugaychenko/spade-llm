@@ -76,7 +76,6 @@ class AgentSearchResponse(BaseModel):
 
 
 class DirectoryFacilitatorAgentConf(BaseModel):
-    agents: dict = Field(description="Dictionary of agents to register.", default={})
     threshold: float = Field(default=400, description="Threshold for searching agents.")
     score_ascending: bool = Field(default=True, description="Should the search be ascending or descending.")
 
@@ -92,9 +91,9 @@ class RegisterAgentBehaviour(MessageHandlingBehavior):
 
     async def step(self):
         if self.message:
-            # May be problem during souble register request in one time
+            # May be problem during double register request in one time
             description = AgentDescription.model_validate_json(json_data=self.message.content)
-            self.config.agents[description.id] = description
+            await self.context.put_item(description.id, description)
             logger.debug("Got description %s", self.message.content)
             logger.info("Registering agent %s", description.id)
             await self.index.aadd_documents(description.to_documents())
@@ -114,24 +113,26 @@ class SearchForAgentBehaviour(MessageHandlingBehavior):
         return (self.config.score_ascending and score <= self.config.threshold) or (
                 not self.config.score_ascending and score >= self.config.threshold)
 
-    def filter_results(self, result: list[(Document, float)], k: int) -> list[AgentDescription]:
+    async def filter_results(self, result: list[(Document, float)], k: int) -> list[AgentDescription]:
         found = set()
+        descriptions = []
         returned = 0
         for doc, score in result:
             agent_id = AgentDescription.extract_agent_id(doc)
             if agent_id not in found and self.filter(score):
                 found.add(agent_id)
-                yield self.config.agents.get(agent_id)
+                descriptions.append(await self.context.get_item(agent_id))
             returned += 1
             if returned >= k:
                 break
+        return descriptions
 
     async def step(self):
         if self.message:
             logger.debug("Got search request %s", self.message.content)
             request = AgentSearchRequest.model_validate_json(json_data=self.message.content)
             result = await self.index.asimilarity_search_with_score(request.task)
-            filtered = list(self.filter_results(result, request.top_k))
+            filtered = await self.filter_results(result, request.top_k)
             await self.context.reply_with_inform(self.message).with_content(
                 AgentSearchResponse(agents=filtered))
 
