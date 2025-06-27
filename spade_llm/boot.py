@@ -12,7 +12,7 @@ from spade_llm.core.messaging import MessageServiceConfig
 from spade_llm.core.models import ModelsProviderConfig
 from spade_llm.core.platform import AgentPlatformImpl
 from spade_llm.core.storage import StorageFactoryConfig
-from spade_llm.core.tools import ToolProviderConfig, DelegateToolConfig
+from spade_llm.core.tools import ToolProviderConfig, DelegateToolConfig, add_toolkit_prefix
 
 
 class AgentConfig(ConfigurableRecord):
@@ -32,7 +32,7 @@ class AgentConfig(ConfigurableRecord):
 class PlatformConfiguration(ToolProviderConfig, ModelsProviderConfig):
     messaging: MessageServiceConfig = Field(description="Configuration for agents messaging service")
     storage: StorageFactoryConfig = Field(description="Configuration for agents state storage")
-    agents: dict[str,AgentConfig] = Field(description="Agents for the system")
+    agents: dict[str, AgentConfig] = Field(description="Agents for the system")
     wait_for_agents: set[str] = Field(
         default=set(),
         description="Name of agents to wait for before shutting down platform. If empty - all agents are awaited.")
@@ -52,7 +52,8 @@ class Boot:
             agent = agent_conf.create_agent()
             tools = []
             for tool_name in agent_conf.tools:
-                tools.append(self.config.create_tool(tool_name))
+                _tool = self.config.create_tool(tool_name)
+                tools.extend(add_toolkit_prefix(tool_name, _tool) if type(_tool) == list else [_tool])
             await platform.register_agent(agent, tools, agent_conf.contacts)
             agents[agent_type] = agent
 

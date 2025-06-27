@@ -1,0 +1,52 @@
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+
+# Define the chat models to use
+chat_models:
+  # Connection to GigaChat 2 Lite
+  max:
+    type_name: spade_llm.models.gigachat.GigaChatModelFactory
+    args:
+      credentials: env.GIGA_CRED
+      scope: env.GIGACHAT_SCOPE
+      model: GigaChat-2-MAX
+      verify_ssl_certs: False
+
+# Tools available in the system
+tools:
+  trigonometry_calculator:
+    type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryCalculatorToolFactory
+    args:
+      type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryToolkit
+      args:
+        precision: 5
+  german_precision_trigonometry_calculator:
+    type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryCalculatorToolFactory
+    args:
+      type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryToolkit
+      args:
+        precision: 14
+agents:
+  # Simple react agent connected to LLM
+  react:
+    type_name: spade_llm.core.react.ReactAgent
+    args:
+      # System prompt for the agent
+      system_prompt: |
+        You are a personal assistant helping with math tasks.
+        Use provided tools to solve user tasks.
+        If answer is number, provide it with maximum precision.
+        Выполняй все вычисления по шагам используя для каждого шага свой инструмент.
+        Не сокращайте ответ.
+      # Model to use
+      model: max
+    # Tools available to the agent
+    tools: [ trigonometry_calculator, german_precision_trigonometry_calculator ]
+  # Console agent which listens for commands from console and sends them to the delegate agent
+  console:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: react
+wait_for_agents: [ console ]

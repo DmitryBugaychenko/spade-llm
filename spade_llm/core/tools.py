@@ -1,10 +1,10 @@
 import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Optional, cast, Any, Type
+from typing import Optional, cast, Any, Type, List
 
 from pydantic import Field, BaseModel
-from langchain_core.tools import BaseTool, StructuredTool
+from langchain_core.tools import BaseTool, StructuredTool, BaseToolkit
 
 from spade_llm import consts
 from spade_llm.core.api import AgentContext, LocalToolFactory
@@ -36,7 +36,7 @@ class ToolProviderConfig(BaseModel, ToolProvider):
         default = dict(),
         description="Dictionary with known tools and their configuration."
     )
-    
+
     def create_tool(self, name: str) -> BaseTool:
         """
         Creates a new instance of tool with given name using configuration
@@ -44,10 +44,10 @@ class ToolProviderConfig(BaseModel, ToolProvider):
         :return: Created tool.
         """
         tool_record = self.tools.get(name)
-        
+
         if tool_record is None:
             raise ValueError(f"No tool found with name '{name}'")
-            
+
         factory = tool_record.create_factory()
         return factory.create_tool()
 
@@ -145,3 +145,11 @@ class DelegateToolConfig(BaseModel, LocalToolFactory):
             args_schema=schema,
             infer_schema=False,
             parse_docstring=False)
+
+
+def add_toolkit_prefix(toolkit_name: str, toolkit: List[BaseTool]) -> List[BaseTool]:
+    add_prefix = lambda prefix, s: f"{prefix}_{s}"
+    for tool in toolkit:
+        tool.name = add_prefix(toolkit_name, tool.name)
+        tool.description = add_prefix(toolkit_name, tool.description)
+    return toolkit
