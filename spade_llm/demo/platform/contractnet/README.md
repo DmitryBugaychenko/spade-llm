@@ -1,4 +1,4 @@
-# Contract Net Demo
+# Contract Net Demo (spade_llm platform)
 
 This demo shows how agent links might be established in dynamics using two concepts:
 1. [Discovery Service](https://ieeexplore.ieee.org/document/4624020) (DF) - a special agent used to search for other agents. It allows others to register in a directory providing description and list of tasks they can handle with examples. Then it allows to search for registered agents. In contrast with traditional DF based on full-text matching and ontologies this one uses vector store and embedings.
@@ -20,7 +20,7 @@ Download data from [financial transactions dataset](https://www.kaggle.com/datas
 Create a SQLite database for the demo%
 
 ```shell
-python ./spade_llm/demo/contractnet/create_database.py ./data
+python ./spade_llm/demo/platform/contractnet/create_database.py ./data
 ```
 
 Configure GigaChat credentials. Follow [instruction](https://developers.sber.ru/docs/ru/gigachat/individuals-quickstart)
@@ -28,7 +28,7 @@ to get them. You can use any langchain compatible model capable of using tools, 
 ```
 export GIGA_CRED=<your access token>
 ```
-If you want to specify API version. Follow [instruction](https://developers.sber.ru/docs/ru/gigachain/overview#langchain-gigachat)
+Configure API version. Follow [instruction](https://developers.sber.ru/docs/ru/gigachain/overview#langchain-gigachat)
 to check them. And export your API version using command
 ```
 export GIGACHAT_SCOPE=<your API version>
@@ -36,7 +36,7 @@ export GIGACHAT_SCOPE=<your API version>
 Run the demo
 
 ```shell
-python -m spade_llm.demo.contractnet.main ./data
+python -m spade_llm.boot ./spade_llm/demo/platform/contractnet/config.yaml
 ```
 
 This demo uses MCC codes and agents description in russian, tested on tasks "Люди, которые ходят в бары" и "Люди, которые ходили в бар в прошлом месяце". 
