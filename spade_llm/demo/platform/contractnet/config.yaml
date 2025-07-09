@@ -12,15 +12,28 @@ chat_models:
       scope: env.GIGACHAT_SCOPE
       model: GigaChat-2-Max
       verify_ssl_certs: False
+tools:
+  mcc_toolkit:
+    type_name: spade_llm.demo.platform.contractnet.planning.MccToolFactory
+    args:
+      type_name: spade_llm.demo.platform.contractnet.planning.MccToolkit
 # Agents to host in the system
 agents:
   # Console agent which listens for commands from console and sends them to the delegate agent
   segment_assembler:
     type_name: spade_llm.demo.platform.contractnet.agents.SegmentAssemblerAgent
   mcc_expert:
-    type_name: spade_llm.demo.platform.contractnet.agents.MccExpertAgent
+    type_name: spade_llm.demo.platform.contractnet.planning.PlanningAgent
     args:
+      system_prompt: |
+        You are a MCC expert. You can help to find number value of mcc code for user query.
+        Тебе сначала нужно получить подробное текстовое описание категории покупок по запросу пользователя, а потом по этому описанию найти MCC код.
+        Use provided tools to solve user tasks.
+
       model: max
+
+    tools:
+      [ mcc_toolkit ]
   period_expert:
     type_name: spade_llm.demo.platform.contractnet.agents.PeriodExpertAgent
     args:

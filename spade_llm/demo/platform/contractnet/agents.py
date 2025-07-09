@@ -281,7 +281,7 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
 
         async def get_mcc(self, task: str):
             await (self.context.request(self.config.mcc_expert).with_content(task))
-            receiver = await self.receive(MessageTemplate(self.context.thread_id), timeout=20)
+            receiver = await self.receive(MessageTemplate(self.context.thread_id), timeout=25)
             return receiver
 
     async def check_table(self, file_path):
@@ -374,11 +374,10 @@ class SpendingProfileAgent(Agent, ContractNetResponder, Configurable[SpendingPro
         self.add_behaviour(ContractNetResponderBehavior(self))
         self.model = self.default_context.create_chat_model(self.config.model)
 
-    async def async_setup(self):
-        await self.register_in_df()
 
     async def register_in_df(self):
         context = self.default_context
+        await asleep(2)
         await (context.inform(DF_ADDRESS).with_content(self.create_description()))
 
 
