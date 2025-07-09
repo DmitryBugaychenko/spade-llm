@@ -151,5 +151,4 @@ def add_toolkit_prefix(toolkit_name: str, toolkit: List[BaseTool]) -> List[BaseT
     add_prefix = lambda prefix, s: f"{prefix}_{s}"
     for tool in toolkit:
         tool.name = add_prefix(toolkit_name, tool.name)
-        tool.description = add_prefix(toolkit_name, tool.description)
     return toolkit

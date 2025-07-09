@@ -24,7 +24,7 @@ class TrigonometryToolkit(BaseToolkit):
 
     @property
     def get_tools(self) -> List[BaseTool]:
-        """Возвращает список инструментов (все тригонометрические функции)."""
+        """Returns a list of tools (all trigonometric functions)."""
         lst = [
             self._create_sin_tool(),
             self._create_cos_tool(),
@@ -42,16 +42,16 @@ class TrigonometryToolkit(BaseToolkit):
                 angle_unit: str = "degrees",
         ) -> float:
             """
-            Выполняет тригонометрический расчет синуса.
+            Performs trigonometric sine calculation.
 
-            Аргументы:
-                angle: Угол для вычисления
-                angle_unit: Единицы измерения угла ('degrees' или 'radians')
+            Arguments:
+                angle: Angle to calculate
+                angle_unit: Angle measurement units ('degrees' or 'radians')
 
-            Возвращает:
-                Результат вычисления в виде float
+            Returns:
+                Calculation result as float
 
-            Примеры:
+            Examples:
                 >>> sin_calculator(30)  # sin(30°)
                 >>> sin_calculator(0.5, angle_unit="radians")  # sin(0.5 rad)
             """
@@ -75,16 +75,16 @@ class TrigonometryToolkit(BaseToolkit):
                 angle_unit: str = "degrees",
         ) -> float:
             """
-            Выполняет тригонометрический расчет косинуса.
+            Performs trigonometric cosine calculation.
 
-            Аргументы:
-                angle: Угол для вычисления
-                angle_unit: Единицы измерения угла ('degrees' или 'radians')
+            Arguments:
+                angle: Angle to calculate
+                angle_unit: Angle measurement units ('degrees' or 'radians')
 
-            Возвращает:
-                Результат вычисления в виде float
+            Returns:
+                Calculation result as float
 
-            Примеры:
+            Examples:
                 >>> cos_calculator(60)  # cos(60°)
                 >>> cos_calculator(1.047, angle_unit="radians")  # cos(1.047 rad)
             """
@@ -107,16 +107,16 @@ class TrigonometryToolkit(BaseToolkit):
                 angle_unit: str = "degrees",
         ) -> float:
             """
-            Выполняет тригонометрический расчет тангенса.
+            Performs trigonometric tangent calculation.
 
-            Аргументы:
-                angle: Угол для вычисления
-                angle_unit: Единицы измерения угла ('degrees' или 'radians')
+            Arguments:
+                angle: Angle to calculate
+                angle_unit: Angle measurement units ('degrees' or 'radians')
 
-            Возвращает:
-                Результат вычисления в виде float
+            Returns:
+                Calculation result as float
 
-            Примеры:
+            Examples:
                 >>> tan_calculator(45)  # tan(45°)
                 >>> tan_calculator(0.785, angle_unit="radians")  # tan(0.785 rad)
             """
@@ -139,16 +139,16 @@ class TrigonometryToolkit(BaseToolkit):
                 angle_unit: str = "degrees",
         ) -> float:
             """
-            Выполняет тригонометрический расчет котангенса.
+            Performs trigonometric cotangent calculation.
 
-            Аргументы:
-                angle: Угол для вычисления
-                angle_unit: Единицы измерения угла ('degrees' или 'radians')
+            Arguments:
+                angle: Angle to calculate
+                angle_unit: Angle measurement units ('degrees' or 'radians')
 
-            Возвращает:
-                Результат вычисления в виде float
+            Returns:
+                Calculation result as float
 
-            Примеры:
+            Examples:
                 >>> cot_calculator(45)  # cot(45°)
                 >>> cot_calculator(0.785, angle_unit="radians")  # cot(0.785 rad)
             """
