@@ -27,7 +27,8 @@ agents:
     args:
       system_prompt: |
         You are a MCC expert. You can help to find number value of mcc code for user query.
-        Тебе сначала нужно получить подробное текстовое описание категории покупок по запросу пользователя, а потом по этому описанию найти MCC код.
+        First, you need to obtain a detailed textual description of the purchase category based on the user's query. 
+        Then, using this description, find the corresponding MCC code.
         Use provided tools to solve user tasks.
 
       model: max

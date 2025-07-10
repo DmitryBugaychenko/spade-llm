@@ -1,36 +1,29 @@
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import PydanticOutputParser
-from markdown_it.common.normalize_url import validateLink
 
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import (
     MessageHandlingBehavior,
-    MessageTemplate,
-    ContextBehaviour,
+    MessageTemplate
 )
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
-from spade_llm.core.api import AgentContext
-import json
 import logging
 import errno
 import os
-from collections import UserList
 from pathlib import Path
-from typing import Optional, Union, Literal, Annotated, List, Tuple
-from asyncio import sleep as asleep
+from typing import Union, Annotated, List, Tuple
 import asyncio
-import aiosqlite
-from aioconsole import ainput
-from aiosqlite import Cursor, Connection
-from async_lru import alru_cache
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import CSVLoader
-
+from spade_llm.core.models import ChatModelConfiguration
+from spade_llm.core.conf import Args
+from spade_llm.demo import models
+from langchain_core.vectorstores import VectorStore
 from spade_llm.core.conf import ConfigurableRecord, Configurable, configuration
 from pydantic import BaseModel, Field, ConfigDict
 from spade_llm.core.tools import ToolFactory
-from langchain_core.tools import tool, BaseTool, StructuredTool, BaseToolkit
+from langchain_core.tools import tool, BaseTool, BaseToolkit
 from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
@@ -54,6 +47,7 @@ class PlanningAgentConfig(BaseModel):
         default=10,
         description="Maximum number of iterations with tools for handling one message",
     )
+    recursion_limit: int = Field(description="Maximum recursion limit for graph", default=10)
 
 
 class PlanExecute(TypedDict):
@@ -96,10 +90,10 @@ class PlanningBehaviour(MessageHandlingBehavior):
                 "system",
                 """{system_prompt} 
                 For the given objective, come up with a simple step by step plan. (напиши его на русском языке) \
-    This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps. \
-    The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
-    You can use the following tools: {tools}
-    Ответь в формате `json`\n{format_instructions}""",
+            This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps. \
+            The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
+            You can use the following tools: {tools}
+            Respond in `json` format\n{format_instructions}""",
             ),
             ("placeholder", "{messages}"),
         ]
@@ -120,14 +114,14 @@ class PlanningBehaviour(MessageHandlingBehavior):
     {past_steps}
 
     Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that. Otherwise, fill out the plan. Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.
-    Ответь в формате `json`\n{format_instructions}
-    """
+    Respond in `json` format\n{format_instructions}"""
     )
 
     def _handle_parser_errors(self):
         """Middleware to handle parser errors gracefully"""
 
-        async def wrapper(input_text: str):
+        async def wrapper(msg):
+            input_text = msg.content
             try:
                 return await self.parser.ainvoke(input_text)
             except Exception as e:
@@ -161,8 +155,6 @@ class PlanningBehaviour(MessageHandlingBehavior):
         self.config = config
 
     async def step(self):
-        if not self.message:
-            return
 
         self.logger.debug("Handling message %s", self.message)
         tools = self.context.get_tools(self.agent)
@@ -173,34 +165,32 @@ class PlanningBehaviour(MessageHandlingBehavior):
         planner = self.planner_prompt | model | self._handle_parser_errors()
         replanner = self.replanner_prompt | model
 
+        async def state_to_context(graph):
+            config = {"configurable": {"thread_id": self.context.thread_id}}
+            snapshot = graph.get_state(config)
+            for k, v in snapshot.values.items():
+                await self.context.put_item(k, v)
+
         async def execute_step(state: PlanExecute):
 
             plan = state["plan"]
             plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
             task = plan[0]
 
-            task_formatted = f"""User query was {state['input']}.
+            msg = f"""User query was {state['input']}.
                             You have already done the following steps:
                             {state['past_steps']}
                             For the following plan:
                             {plan_str}\n\nYou are tasked with executing step {1}, {task}.
                             Проводи вычисления только для этого шага."""
-
-            msg = task_formatted
-            if not msg:
-                return
             agent_response = ""
-
             answers = []
             user_message = HumanMessage(msg)
 
             for _ in range(self.max_iterations):
-                # answer = await model.ainvoke(
-                #     self.initial_message + [user_message] + answers)
-                t = [SystemMessage("""You are a personal assistant helping with data about mcc codes.
-        Use provided tools to solve user tasks.
-        """)]
-                answer = await model.ainvoke(t + [user_message] + answers)
+                mcc_prompt = [SystemMessage("""You are a personal assistant helping with data about mcc codes.
+                                    Use provided tools to solve user tasks.""")]
+                answer = await model.ainvoke(mcc_prompt + [user_message] + answers)
                 self.logger.debug("Got answer %s", answer)
 
                 answers.append(answer)
@@ -272,22 +262,20 @@ class PlanningBehaviour(MessageHandlingBehavior):
             return app
 
         app = create_graph()
-        config = {"recursion_limit": 10, "configurable": {"thread_id": self.context.thread_id}}
+        config = {"recursion_limit": self.config.recursion_limit, "configurable": {"thread_id": self.context.thread_id}}
         inputs = {"input": self.message.content}
+        result = ""
 
         async for event in app.astream(inputs, config=config):
             for k, v in event.items():
                 if k != "__end__":
                     if "response" in v:
-                        res = v["response"]
+                        result = v["response"]
                         break
+            await state_to_context(app)
 
-        config = {"configurable": {"thread_id": self.context.thread_id}}
-        # print(*list(app.get_state_history(config)),sep='\n')
-        if type(res) == str:
-            await self.context.reply_with_inform(self.message).with_content(res)
-        else:
-            await self.context.reply_with_inform(self.message).with_content(res[-1])
+        self.logger.info("Got MCC code %s", result)
+        await self.context.reply_with_inform(self.message).with_content(result)
 
 
 @configuration(PlanningAgentConfig)
@@ -312,20 +300,6 @@ class MccDescription(BaseModel):
     description: str = Field(description="Описание категории транзакций")
 
 
-SENSITIVE_KEYS = ["access_token", "password", "key_file_password", "credentials", "scope"]
-
-from langchain_gigachat.chat_models import GigaChat
-
-
-class GigaChatWithExtra(GigaChat, extra="ignore"):
-    pass
-
-
-from spade_llm.core.models import ChatModelConfiguration
-from spade_llm.core.conf import Args
-from spade_llm.demo import models
-from langchain_core.vectorstores import VectorStore
-
 
 class MccToolkit(BaseToolkit):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -345,8 +319,7 @@ class MccToolkit(BaseToolkit):
                 ),
             )
         }
-        fac = conf["max"].create_model_factory()
-        self.model = fac.create_model()
+        self.model = conf["max"].create_model_factory().create_model()
         self.index = Chroma(
             embedding_function=models.EMBEDDINGS, collection_name="MCC"
         )
@@ -381,7 +354,7 @@ class MccToolkit(BaseToolkit):
 
     @property
     def get_tools(self) -> List[BaseTool]:
-        """Возвращает список инструментов"""
+        """Returns a list of tools"""
         asyncio.create_task(self.async_setup())
         lst = [
             self._create_mcc_descriptor(),
@@ -392,28 +365,28 @@ class MccToolkit(BaseToolkit):
     def _create_mcc_descriptor(self) -> BaseTool:
         parser = PydanticOutputParser(pydantic_object=MccDescription)
         prepare_request_prompt = PromptTemplate.from_template(
-            """Твоя задача сформулировать описание MCC кода для транзакций, обозначающей траты людей 
-            подпадающих под характеристику "{query}". Описание должно соответствовать следующим критериям:
-            * Не менее 40 слов
-            * Отсутствие привязки ко времени
-            * Включает название товаров и услуг связанных с активностью
-            * Включает типы торговых точек и предприятий где эти товары и услуги продаются
-            Ответь в формате `json`\n{format_instructions}"""
+            """Your task is to formulate a description of an MCC code for transactions representing spending by people 
+            who fall under the characteristic "{query}". The description must meet the following criteria:
+            * At least 40 words long
+            * No time-specific references
+            * Includes names of goods and services related to the activity
+            * Includes types of retail outlets and businesses where these goods and services are sold
+            Respond in `json` format\n{format_instructions}"""
         )
 
         @tool
         async def mcc_descriptor(query: str):
-            """Возвращает подробное описание категории трат по запросу.
+            """Returns a detailed description of a spending category based on the query.
 
-            Аргументы:
-                query: Запрос пользователя (например, 'Посетители ресторанов') в виде строки.
+            Args:
+                query: User query (e.g., 'Restaurant visitors') as a string.
 
-            Возвращает:
-                Подробное описание категории трат по запросу
+            Returns:
+                Detailed description of the spending category based on the query
 
-            Примеры:
-                >>> mcc_descriptor("Люди которые ходят в бар")  # Возвращает подробное описание категории Бары
-                >>> mcc_descriptor("Рестораны")  # Поиск по названию категории
+            Examples:
+                >>> mcc_descriptor("People who go to bars")  # Returns a detailed description of the Bars category
+                >>> mcc_descriptor("Restaurants")  # Search by category name
             """
             chain = self.model | parser
             request: MccDescription = await chain.ainvoke(
@@ -431,20 +404,19 @@ class MccToolkit(BaseToolkit):
     def _create_mcc_finder(self) -> BaseTool:
         @tool
         async def mcc_finder(description: str):
-            """Находит подходящие MCC коды по описанию вида деятельности.
-            Перед использованием инструмента вызовите mcc_descriptor для получения описания mcc кода
+            """Finds appropriate MCC codes based on business activity description.
+            Before using this tool, call mcc_descriptor to get the MCC code description.
 
-                    Аргументы:
-                        description: Описание бизнеса или вида деятельности (например, 'продажа одежды') Этот параметр должен быть очень подробным.
+            Args:
+                description: Business or activity description (e.g., 'clothing retail') This parameter should be very detailed.
 
+            Returns:
+                Appropriate MCC code as a number
 
-                    Возвращает:
-                        Подходящий MCC код в виде числа
-
-                    Примеры:
-                        >>> mcc_finder("продажа одежды")  # Найти коды для розничной торговли одеждой
-                        >>> mcc_finder("услуги такси")  # Найти коды для транспортных услуг
-                    """
+            Examples:
+                >>> mcc_finder("clothing retail")  # Find codes for clothing retail
+                >>> mcc_finder("taxi services")  # Find codes for transportation services
+            """
             result = await self.index.asimilarity_search(query=description, k=1)
             doc = result[0]
             return str(doc.metadata["MCC"])
