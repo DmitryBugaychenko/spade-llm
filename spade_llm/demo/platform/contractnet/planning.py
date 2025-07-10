@@ -42,6 +42,7 @@ class PlanningAgentConfig(BaseModel):
         description="System prompt for the agent. It should contain instructions for the agent on "
                     "what goal to persuade and how to behave."
     )
+    helper_prompt: str = Field(description="Prompt for the react agent.")
     model: str = Field(description="Model to use for handling messages.")
     max_iterations: int = Field(
         default=10,
@@ -93,7 +94,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
             This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps. \
             The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
             You can use the following tools: {tools}
-            Respond in `json` format\n{format_instructions}""",
+            Respond in `json` format\n{format_instructions}. JSON only, without Markdown and additional text""",
             ),
             ("placeholder", "{messages}"),
         ]
@@ -114,29 +115,14 @@ class PlanningBehaviour(MessageHandlingBehavior):
     {past_steps}
 
     Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that. Otherwise, fill out the plan. Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.
-    Respond in `json` format\n{format_instructions}"""
+    Respond in `json` format\n{format_instructions}. JSON only, without Markdown and additional text"""
     )
 
     def _handle_parser_errors(self):
         """Middleware to handle parser errors gracefully"""
 
         async def wrapper(msg):
-            input_text = msg.content
-            try:
-                return await self.parser.ainvoke(input_text)
-            except Exception as e:
-                # Try to extract JSON from response if possible
-                try:
-                    json_start = input_text.find("{")
-                    json_end = input_text.rfind("}") + 1
-                    json_str = input_text[json_start:json_end]
-                    return await self.parser.ainvoke(json_str)
-                except Exception:
-                    # Fallback to manual parsing if automatic fails
-                    steps = []
-                    for line in input_text.split("\n"):
-                        steps.append(line.strip())
-                    return Plan(steps=steps if steps else ["Could not parse plan"])
+            return await self.parser.ainvoke(msg.content)
 
         return wrapper
 
@@ -176,7 +162,6 @@ class PlanningBehaviour(MessageHandlingBehavior):
             plan = state["plan"]
             plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
             task = plan[0]
-
             msg = f"""User query was {state['input']}.
                             You have already done the following steps:
                             {state['past_steps']}
@@ -185,12 +170,10 @@ class PlanningBehaviour(MessageHandlingBehavior):
                             Проводи вычисления только для этого шага."""
             agent_response = ""
             answers = []
-            user_message = HumanMessage(msg)
-
+            current_task = HumanMessage(msg)
             for _ in range(self.max_iterations):
-                mcc_prompt = [SystemMessage("""You are a personal assistant helping with data about mcc codes.
-                                    Use provided tools to solve user tasks.""")]
-                answer = await model.ainvoke(mcc_prompt + [user_message] + answers)
+                mcc_prompt = [SystemMessage(self.config.helper_prompt)]
+                answer = await model.ainvoke(mcc_prompt + [current_task] + answers)
                 self.logger.debug("Got answer %s", answer)
 
                 answers.append(answer)
