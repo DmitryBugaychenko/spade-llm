@@ -140,111 +140,112 @@ class PlanningBehaviour(MessageHandlingBehavior):
         self.initial_message = [SystemMessage(system_prompt)]
         self.config = config
 
+    async def state_to_context(self, graph):
+        config = {"configurable": {"thread_id": self.context.thread_id}}
+        snapshot = graph.get_state(config)
+        for k, v in snapshot.values.items():
+            await self.context.put_item(k, v)
+
+    async def execute_step(self, state: PlanExecute):
+
+        plan = state["plan"]
+        plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
+        task = plan[0]
+        msg = f"""User query was {state['input']}.
+                        You have already done the following steps:
+                        {state['past_steps']}
+                        For the following plan:
+                        {plan_str}\n\nYou are tasked with executing step {1}, {task}.
+                        Проводи вычисления только для этого шага."""
+        agent_response = ""
+        answers = []
+        current_task = HumanMessage(msg)
+        for _ in range(self.max_iterations):
+            mcc_prompt = [SystemMessage(self.config.helper_prompt)]
+            answer = await self.model.ainvoke(mcc_prompt + [current_task] + answers)
+            self.logger.debug("Got answer %s", answer)
+
+            answers.append(answer)
+
+            if isinstance(answer, AIMessage) and answer.tool_calls:
+                for tool_call in answer.tool_calls:
+                    tool_name = tool_call["name"]
+                    logger.debug("Invoking tool %s", tool_name)
+                    if tool_name in self.tools_dict:
+                        selected_tool = self.tools_dict[tool_name]
+                        tool_answer = await selected_tool.ainvoke(tool_call["args"])
+                        logger.debug("Tool %s answered %s", tool_name, tool_answer)
+                        answers.append(ToolMessage(tool_answer, tool_call_id=tool_call["id"]))
+                    else:
+                        logger.warning("Tool %s not found", tool_name)
+                        agent_response = f"Tool requested by model not found {tool_name}"
+            else:
+                logger.debug("Got final answer %s", answer)
+                agent_response = answer.content
+                break
+
+        t = state["past_steps"] + ["На запрос:" + task + "\nОтвет:" + agent_response]
+        return {"past_steps": t}
+
+    async def plan_step(self, state: PlanExecute):
+        plan = await self.planner.ainvoke(
+            {
+                "messages": [("user", state["input"])],
+                "system_prompt": self.initial_message,
+                "query": self.user_message,
+                "format_instructions": self.parser.get_format_instructions(),
+                "tools": self.tools_dict,
+            }
+        )
+        return {"plan": plan.steps}
+
+    async def replan_step(self, state: PlanExecute):
+
+        d = state.copy()
+        d.update({"format_instructions": self.act_parser.get_format_instructions(),
+                  "system_prompt": self.initial_message})
+        output = await self.replanner.ainvoke(d)
+        output = self.act_parser.parse(output.content)
+        if isinstance(output.action, Response):
+            return {"response": output.action.response}
+        else:
+            return {"plan": output.action.steps}
+
+    def should_end(self, state: PlanExecute):
+        if "response" in state and state["response"]:
+            return END
+        else:
+            return "agent"
+
+    def create_graph(self):
+        workflow = StateGraph(PlanExecute)
+        workflow.add_node("planner", self.plan_step)
+        workflow.add_node("agent", self.execute_step)
+        workflow.add_node("replan", self.replan_step)
+        workflow.add_edge(START, "planner")
+        workflow.add_edge("planner", "agent")
+        workflow.add_edge("agent", "replan")
+        workflow.add_conditional_edges(
+            "replan",
+            self.should_end,
+            ["agent", END],
+        )
+        checkpointer = InMemorySaver()
+        app = workflow.compile(checkpointer=checkpointer)
+        return app
+
     async def step(self):
+        tools = self.context.get_tools(self.agent)
+        self.tools_dict = {tool.name: tool for tool in tools}
+        self.model = self.model.bind_tools(tools)
+
+        self.planner = self.planner_prompt | self.model | self._handle_parser_errors()
+        self.replanner = self.replanner_prompt | self.model
+
+        self.user_message = HumanMessage(self.message.content)
 
         self.logger.debug("Handling message %s", self.message)
-        tools = self.context.get_tools(self.agent)
-        model = self.model.bind_tools(tools)
-        tools_dict = {tool.name: tool for tool in tools}
-        user_message = HumanMessage(self.message.content)
-
-        planner = self.planner_prompt | model | self._handle_parser_errors()
-        replanner = self.replanner_prompt | model
-
-        async def state_to_context(graph):
-            config = {"configurable": {"thread_id": self.context.thread_id}}
-            snapshot = graph.get_state(config)
-            for k, v in snapshot.values.items():
-                await self.context.put_item(k, v)
-
-        async def execute_step(state: PlanExecute):
-
-            plan = state["plan"]
-            plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
-            task = plan[0]
-            msg = f"""User query was {state['input']}.
-                            You have already done the following steps:
-                            {state['past_steps']}
-                            For the following plan:
-                            {plan_str}\n\nYou are tasked with executing step {1}, {task}.
-                            Проводи вычисления только для этого шага."""
-            agent_response = ""
-            answers = []
-            current_task = HumanMessage(msg)
-            for _ in range(self.max_iterations):
-                mcc_prompt = [SystemMessage(self.config.helper_prompt)]
-                answer = await model.ainvoke(mcc_prompt + [current_task] + answers)
-                self.logger.debug("Got answer %s", answer)
-
-                answers.append(answer)
-
-                if isinstance(answer, AIMessage) and answer.tool_calls:
-                    for tool_call in answer.tool_calls:
-                        tool_name = tool_call["name"]
-                        logger.debug("Invoking tool %s", tool_name)
-                        if tool_name in tools_dict:
-                            selected_tool = tools_dict[tool_name]
-                            tool_answer = await selected_tool.ainvoke(tool_call["args"])
-                            logger.debug("Tool %s answered %s", tool_name, tool_answer)
-                            answers.append(ToolMessage(tool_answer, tool_call_id=tool_call["id"]))
-                        else:
-                            logger.warning("Tool %s not found", tool_name)
-                            agent_response = f"Tool requested by model not found {tool_name}"
-                else:
-                    logger.debug("Got final answer %s", answer)
-                    agent_response = answer.content
-                    break
-
-            t = state["past_steps"] + ["На запрос:" + task + "\nОтвет:" + agent_response]
-            return {"past_steps": t}
-
-        async def plan_step(state: PlanExecute):
-            plan = await planner.ainvoke(
-                {
-                    "messages": [("user", state["input"])],
-                    "system_prompt": self.initial_message,
-                    "query": user_message,
-                    "format_instructions": self.parser.get_format_instructions(),
-                    "tools": tools_dict,
-                }
-            )
-            return {"plan": plan.steps}
-
-        async def replan_step(state: PlanExecute):
-            d = state.copy()
-            d.update({"format_instructions": self.act_parser.get_format_instructions(),
-                      "system_prompt": self.initial_message})
-            output = await replanner.ainvoke(d)
-            output = self.act_parser.parse(output.content)
-            if isinstance(output.action, Response):
-                return {"response": output.action.response}
-            else:
-                return {"plan": output.action.steps}
-
-        def should_end(state: PlanExecute):
-            if "response" in state and state["response"]:
-                return END
-            else:
-                return "agent"
-
-        def create_graph():
-            workflow = StateGraph(PlanExecute)
-            workflow.add_node("planner", plan_step)
-            workflow.add_node("agent", execute_step)
-            workflow.add_node("replan", replan_step)
-            workflow.add_edge(START, "planner")
-            workflow.add_edge("planner", "agent")
-            workflow.add_edge("agent", "replan")
-            workflow.add_conditional_edges(
-                "replan",
-                should_end,
-                ["agent", END],
-            )
-            checkpointer = InMemorySaver()
-            app = workflow.compile(checkpointer=checkpointer)
-            return app
-
-        app = create_graph()
+        app = self.create_graph()
         config = {"recursion_limit": self.config.recursion_limit, "configurable": {"thread_id": self.context.thread_id}}
         inputs = {"input": self.message.content}
         result = ""
@@ -255,7 +256,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
                     if "response" in v:
                         result = v["response"]
                         break
-            await state_to_context(app)
+            await self.state_to_context(app)
 
         self.logger.info("Got MCC code %s", result)
         await self.context.reply_with_inform(self.message).with_content(result)
@@ -281,7 +282,6 @@ class MccToolkitConf(ConfigurableRecord):
 
 class MccDescription(BaseModel):
     description: str = Field(description="Описание категории транзакций")
-
 
 
 class MccToolkit(BaseToolkit):
@@ -354,7 +354,7 @@ class MccToolkit(BaseToolkit):
             * No time-specific references
             * Includes names of goods and services related to the activity
             * Includes types of retail outlets and businesses where these goods and services are sold
-            Respond in `json` format\n{format_instructions}"""
+            Respond in `json` format\n{format_instructions}. JSON only, without Markdown and additional text"""
         )
 
         @tool
