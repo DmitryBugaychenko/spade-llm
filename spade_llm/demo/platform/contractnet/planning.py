@@ -2,9 +2,10 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import PydanticOutputParser
 
 from spade_llm.core.agent import Agent
+from spade_llm.core.api import AgentContext
 from spade_llm.core.behaviors import (
     MessageHandlingBehavior,
-    MessageTemplate
+    MessageTemplate, ContextBehaviour
 )
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
@@ -33,6 +34,7 @@ from langchain_core.messages import (
 import operator
 from typing_extensions import TypedDict
 from langgraph.graph import END, StateGraph, START
+from langgraph.graph.state import CompiledStateGraph
 
 logger = logging.getLogger(__name__)
 
@@ -140,12 +142,6 @@ class PlanningBehaviour(MessageHandlingBehavior):
         self.initial_message = [SystemMessage(system_prompt)]
         self.config = config
 
-    async def state_to_context(self, graph):
-        config = {"configurable": {"thread_id": self.context.thread_id}}
-        snapshot = graph.get_state(config)
-        for k, v in snapshot.values.items():
-            await self.context.put_item(k, v)
-
     async def execute_step(self, state: PlanExecute):
 
         plan = state["plan"]
@@ -246,20 +242,41 @@ class PlanningBehaviour(MessageHandlingBehavior):
 
         self.logger.debug("Handling message %s", self.message)
         app = self.create_graph()
-        config = {"recursion_limit": self.config.recursion_limit, "configurable": {"thread_id": self.context.thread_id}}
+        graph_config = {"recursion_limit": self.config.recursion_limit,
+                        "configurable": {"thread_id": self.context.thread_id}}
         inputs = {"input": self.message.content}
-        result = ""
 
-        async for event in app.astream(inputs, config=config):
-            for k, v in event.items():
-                if k != "__end__":
-                    if "response" in v:
-                        result = v["response"]
-                        break
-            await self.state_to_context(app)
+        graph_invoke = GraphInvokeBehaviour(context=self.context,
+                                            app=app,
+                                            inputs=inputs,
+                                            graph_config=graph_config)
+        self.agent.add_behaviour(graph_invoke)
+        await graph_invoke.join()
 
+        result = await self.context.get_item('response')
         self.logger.info("Got MCC code %s", result)
         await self.context.reply_with_inform(self.message).with_content(result)
+
+
+class GraphInvokeBehaviour(ContextBehaviour):
+    def __init__(self, context: AgentContext, app: CompiledStateGraph, inputs, graph_config):
+        super().__init__(context)
+        self.app = app
+        self.graph_config = graph_config
+        self.iterator = app.astream(inputs, config=graph_config).__aiter__()
+
+    async def state_to_context(self, graph):
+        snapshot_config = {"configurable": {"thread_id": self.context.thread_id}}
+        snapshot = graph.get_state(snapshot_config)
+        for k, v in snapshot.values.items():
+            await self.context.put_item(k, v)
+
+    async def step(self):
+        try:
+            event = await self.iterator.__anext__()
+            await self.state_to_context(self.app)
+        except StopAsyncIteration:
+            self.set_is_done()
 
 
 @configuration(PlanningAgentConfig)
