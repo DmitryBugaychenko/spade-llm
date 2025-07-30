@@ -14,16 +14,16 @@ chat_models:
       verify_ssl_certs: False
 tools:
   mcc_toolkit:
-    type_name: spade_llm.demo.platform.contractnet.planning.MccToolFactory
+    type_name: spade_llm.demo.platform.contractnet.mcc_toolkit.MccToolFactory
     args:
-      type_name: spade_llm.demo.platform.contractnet.planning.MccToolkit
+      type_name: spade_llm.demo.platform.contractnet.mcc_toolkit.MccToolkit
 # Agents to host in the system
 agents:
   # Console agent which listens for commands from console and sends them to the delegate agent
   segment_assembler:
     type_name: spade_llm.demo.platform.contractnet.agents.SegmentAssemblerAgent
   mcc_expert:
-    type_name: spade_llm.demo.platform.contractnet.planning.PlanningAgent
+    type_name: spade_llm.core.planning.PlanningAgent
     args:
       system_prompt: |
         You are a MCC expert. You can help to find number value of mcc code for user query.
