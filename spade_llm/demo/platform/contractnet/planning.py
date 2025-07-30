@@ -44,7 +44,8 @@ class PlanningAgentConfig(BaseModel):
         description="System prompt for the agent. It should contain instructions for the agent on "
                     "what goal to persuade and how to behave."
     )
-    helper_prompt: str = Field(description="Prompt for the react agent.")
+    react_node_prompt: str = Field(description="Prompt for the react node in the planning agent.")
+    response_format: str = Field(description="Instructions for the agent on how to respond.")
     model: str = Field(description="Model to use for handling messages.")
     max_iterations: int = Field(
         default=10,
@@ -54,6 +55,15 @@ class PlanningAgentConfig(BaseModel):
 
 
 class PlanExecute(TypedDict):
+    """State container for planning/execution workflow.
+
+    Attributes:
+        input: Original user query
+        plan: Current step-by-step plan
+        past_steps: Completed steps with results
+        response: Final response for user
+        format_instructions: Output parsing instructions
+    """
     input: str
     plan: List[str]
     past_steps: Annotated[List[Tuple], operator.add]
@@ -70,7 +80,7 @@ class Plan(BaseModel):
 
 
 class Response(BaseModel):
-    """Response to user. Должен быть в виде одного числа"""
+    """Response to user."""
 
     response: str
 
@@ -79,7 +89,7 @@ class Act(BaseModel):
     """Action to perform."""
 
     action: Union[Response, Plan] = Field(
-        description="Action to perform. If you want to respond to user, use esponse. "
+        description="Action to perform. If you want to respond to user, use response. "
                     "If you need to further use tools to get the answer, use Plan."
     )
 
@@ -92,7 +102,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
             (
                 "system",
                 """{system_prompt} 
-                For the given objective, come up with a simple step by step plan. (напиши его на русском языке) \
+                For the given objective, come up with a simple step by step plan.\
             This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps. \
             The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
             You can use the following tools: {tools}
@@ -116,7 +126,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
     You have currently done the follow steps:
     {past_steps}
 
-    Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that. Otherwise, fill out the plan. Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.
+    Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that using this format: {response_format}. Otherwise, fill out the plan. Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.
     Respond in `json` format\n{format_instructions}. JSON only, without Markdown and additional text"""
     )
 
@@ -151,13 +161,13 @@ class PlanningBehaviour(MessageHandlingBehavior):
                         You have already done the following steps:
                         {state['past_steps']}
                         For the following plan:
-                        {plan_str}\n\nYou are tasked with executing step {1}, {task}.
-                        Проводи вычисления только для этого шага."""
+                        {plan_str}\n\nNow your task is to execute step '{1}'.
+                        Perform calculations only for this step."""
         agent_response = ""
         answers = []
         current_task = HumanMessage(msg)
         for _ in range(self.max_iterations):
-            mcc_prompt = [SystemMessage(self.config.helper_prompt)]
+            mcc_prompt = [SystemMessage(self.config.react_node_prompt)]
             answer = await self.model.ainvoke(mcc_prompt + [current_task] + answers)
             self.logger.debug("Got answer %s", answer)
 
@@ -196,10 +206,10 @@ class PlanningBehaviour(MessageHandlingBehavior):
         return {"plan": plan.steps}
 
     async def replan_step(self, state: PlanExecute):
-
         d = state.copy()
         d.update({"format_instructions": self.act_parser.get_format_instructions(),
-                  "system_prompt": self.initial_message})
+                  "system_prompt": self.initial_message,
+                  "response_format": self.config.response_format})
         output = await self.replanner.ainvoke(d)
         output = self.act_parser.parse(output.content)
         if isinstance(output.action, Response):
@@ -246,7 +256,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
                         "configurable": {"thread_id": self.context.thread_id}}
         inputs = {"input": self.message.content}
 
-        graph_invoke = GraphInvokeBehaviour(context=self.context,
+        graph_invoke = ExecuteLangGraphBehaviour(context=self.context,
                                             app=app,
                                             inputs=inputs,
                                             graph_config=graph_config)
@@ -257,8 +267,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
         self.logger.info("Got MCC code %s", result)
         await self.context.reply_with_inform(self.message).with_content(result)
 
-
-class GraphInvokeBehaviour(ContextBehaviour):
+class ExecuteLangGraphBehaviour(ContextBehaviour):
     def __init__(self, context: AgentContext, app: CompiledStateGraph, inputs, graph_config):
         super().__init__(context)
         self.app = app

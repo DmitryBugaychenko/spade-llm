@@ -30,9 +30,11 @@ agents:
         First, you need to obtain a detailed textual description of the purchase category based on the user's query. 
         Then, using this description, find the corresponding MCC code.
         Use provided tools to solve user tasks.
-      helper_prompt: |
+      react_node_prompt: |
         You are a personal assistant helping with data about mcc codes.
         Use provided tools to solve user tasks.
+      response_format: |
+        It must be in the form of a single number.
       model: max
 
     tools:
