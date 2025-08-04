@@ -1,28 +1,29 @@
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.output_parsers import PydanticOutputParser
-
-from spade_llm.core.agent import Agent
-from spade_llm.core.api import AgentContext
-from spade_llm.core.behaviors import (
-    MessageHandlingBehavior,
-    MessageTemplate, ContextBehaviour
-)
-from langgraph.checkpoint.memory import InMemorySaver
-from langchain_core.prompts import ChatPromptTemplate
 import logging
+import operator
 from typing import Union, Annotated, List, Tuple
-from spade_llm.core.conf import Configurable, configuration
-from pydantic import BaseModel, Field
+
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
     AIMessage,
     ToolMessage,
 )
-import operator
-from typing_extensions import TypedDict
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.graph.state import CompiledStateGraph
+from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
+
+from spade_llm.core.agent import Agent
+from spade_llm.core.api import AgentContext, Message
+from spade_llm.core.behaviors import (
+    MessageHandlingBehavior,
+    MessageTemplate, ContextBehaviour
+)
+from spade_llm.core.conf import Configurable, configuration
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class PlanningAgentConfig(BaseModel):
         default=10,
         description="Maximum number of iterations with tools for handling one message",
     )
-    recursion_limit: int = Field(description="Maximum recursion limit for graph", default=10)
+    recursion_limit: int = Field(description="Maximum recursion limit for graph", default=20)
 
 
 class PlanExecute(TypedDict):
@@ -52,11 +53,16 @@ class PlanExecute(TypedDict):
         response: Final response for user
         format_instructions: Output parsing instructions
     """
-    input: str
+    input: Message
     plan: List[str]
     past_steps: Annotated[List[Tuple], operator.add]
     response: str
     format_instructions: str
+    iteration_num: int
+    llm_invoke: AIMessage
+    answers_list: List
+    tool_num: int
+    task: str
 
 
 class Plan(BaseModel):
@@ -141,73 +147,86 @@ class PlanningBehaviour(MessageHandlingBehavior):
         self.config = config
 
     async def execute_step(self, state: PlanExecute):
-
         plan = state["plan"]
         plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
-        task = plan[0]
         msg = f"""User query was {state['input']}.
                         You have already done the following steps:
                         {state['past_steps']}
                         For the following plan:
                         {plan_str}\n\nNow your task is to execute step '{1}'.
                         Perform calculations only for this step."""
-        agent_response = ""
-        answers = []
         current_task = HumanMessage(msg)
-        for _ in range(self.max_iterations):
-            mcc_prompt = [SystemMessage(self.config.react_node_prompt)]
-            answer = await self.model.ainvoke(mcc_prompt + [current_task] + answers)
-            self.logger.debug("Got answer %s", answer)
+        step_prompt = [SystemMessage(self.config.react_node_prompt)]
+        answer = await self.model.ainvoke(step_prompt + [current_task] + state["answers_list"])
+        self.logger.debug("Got answer %s", answer)
+        state["answers_list"].append(answer)
+        if isinstance(answer, AIMessage) and not answer.tool_calls:
+            logger.debug("Got final answer %s", answer)
+            agent_response = answer.content
 
-            answers.append(answer)
+            t = state["past_steps"] + ["На запрос:" + state["task"] + "\nОтвет:" + agent_response]
+            return {"llm_invoke": answer, "iteration_num": state["iteration_num"] + 1, "tool_num": 0, "task": plan[0],
+                    "past_steps": t}
 
-            if isinstance(answer, AIMessage) and answer.tool_calls:
-                for tool_call in answer.tool_calls:
-                    tool_name = tool_call["name"]
-                    logger.debug("Invoking tool %s", tool_name)
-                    if tool_name in self.tools_dict:
-                        selected_tool = self.tools_dict[tool_name]
-                        tool_answer = await selected_tool.ainvoke(tool_call["args"])
-                        logger.debug("Tool %s answered %s", tool_name, tool_answer)
-                        answers.append(ToolMessage(tool_answer, tool_call_id=tool_call["id"]))
-                    else:
-                        logger.warning("Tool %s not found", tool_name)
-                        agent_response = f"Tool requested by model not found {tool_name}"
-            else:
-                logger.debug("Got final answer %s", answer)
-                agent_response = answer.content
-                break
+        return {"llm_invoke": answer, "iteration_num": state["iteration_num"] + 1, "tool_num": 0, "task": plan[0]}
 
-        t = state["past_steps"] + ["На запрос:" + task + "\nОтвет:" + agent_response]
-        return {"past_steps": t}
+    async def tool_step(self, state: PlanExecute):
+        tool_call = state["llm_invoke"].tool_calls[state["tool_num"]]
+        tool_name = tool_call["name"]
+        logger.info("Invoking tool %s", tool_name)
+        if tool_name in self.tools_dict:
+            selected_tool = self.tools_dict[tool_name]
+            tool_answer = await selected_tool.ainvoke(tool_call["args"])
+            logger.debug("Tool %s answered %s", tool_name, tool_answer)
+            state["answers_list"].append(ToolMessage(tool_answer, tool_call_id=tool_call["id"]))
+        else:
+            logger.warning("Tool %s not found", tool_name)
+            agent_response = f"Tool requested by model not found {tool_name}"
+        return {"tool_num": state["tool_num"] + 1}
+
+    def agent_switch(self, state: PlanExecute):
+        if state["iteration_num"] < self.max_iterations and (
+                isinstance(state["llm_invoke"], AIMessage) and state["llm_invoke"].tool_calls):
+            return "tool"
+        else:
+            return "replan"
 
     async def plan_step(self, state: PlanExecute):
         plan = await self.planner.ainvoke(
             {
-                "messages": [("user", state["input"])],
+                "messages": [("user", state["input"].content)],
                 "system_prompt": self.initial_message,
                 "query": self.user_message,
                 "format_instructions": self.parser.get_format_instructions(),
                 "tools": self.tools_dict,
             }
         )
-        return {"plan": plan.steps}
+        return {"plan": plan.steps, "iteration_num": 0, "answers_list": []}
 
     async def replan_step(self, state: PlanExecute):
-        d = state.copy()
-        d.update({"format_instructions": self.act_parser.get_format_instructions(),
-                  "system_prompt": self.initial_message,
-                  "response_format": self.config.response_format})
-        output = await self.replanner.ainvoke(d)
-        output = self.act_parser.parse(output.content)
-        if isinstance(output.action, Response):
-            return {"response": output.action.response}
+        replanner_dict = state.copy()
+        replanner_dict.update({"format_instructions": self.act_parser.get_format_instructions(),
+                               "system_prompt": self.initial_message,
+                               "response_format": self.config.response_format})
+        output = await self.replanner.ainvoke(replanner_dict)
+        replan_decision = self.act_parser.parse(output.content)
+        if isinstance(replan_decision.action, Response):
+            result = replan_decision.action.response
+            self.logger.info("Got result %s", result)
+            await self.context.reply_with_inform(state["input"]).with_content(result)
+            return {"response": replan_decision.action.response}
         else:
-            return {"plan": output.action.steps}
+            return {"plan": replan_decision.action.steps, "iteration_num": 0, "answers_list": []}
 
     def should_end(self, state: PlanExecute):
         if "response" in state and state["response"]:
             return END
+        else:
+            return "agent"
+
+    def tool_cycle(self, state: PlanExecute):
+        if state["tool_num"] < len(state["llm_invoke"].tool_calls):
+            return "tool"
         else:
             return "agent"
 
@@ -216,9 +235,21 @@ class PlanningBehaviour(MessageHandlingBehavior):
         workflow.add_node("planner", self.plan_step)
         workflow.add_node("agent", self.execute_step)
         workflow.add_node("replan", self.replan_step)
+        workflow.add_node("tool", self.tool_step)
+
         workflow.add_edge(START, "planner")
         workflow.add_edge("planner", "agent")
-        workflow.add_edge("agent", "replan")
+        workflow.add_conditional_edges(
+            "agent",
+            self.agent_switch,
+            ["replan", "tool"],
+        )
+        workflow.add_edge("tool", "agent")
+        workflow.add_conditional_edges(
+            "tool",
+            self.tool_cycle,
+            ["agent", "tool"],
+        )
         workflow.add_conditional_edges(
             "replan",
             self.should_end,
@@ -242,18 +273,14 @@ class PlanningBehaviour(MessageHandlingBehavior):
         app = self.create_graph()
         graph_config = {"recursion_limit": self.config.recursion_limit,
                         "configurable": {"thread_id": self.context.thread_id}}
-        inputs = {"input": self.message.content}
+        inputs = {"input": self.message}
 
         graph_invoke = ExecuteLangGraphBehaviour(context=self.context,
-                                            app=app,
-                                            inputs=inputs,
-                                            graph_config=graph_config)
+                                                 app=app,
+                                                 inputs=inputs,
+                                                 graph_config=graph_config)
         self.agent.add_behaviour(graph_invoke)
-        await graph_invoke.join()
 
-        result = await self.context.get_item('response')
-        self.logger.info("Got MCC code %s", result)
-        await self.context.reply_with_inform(self.message).with_content(result)
 
 class ExecuteLangGraphBehaviour(ContextBehaviour):
     def __init__(self, context: AgentContext, app: CompiledStateGraph, inputs, graph_config):
