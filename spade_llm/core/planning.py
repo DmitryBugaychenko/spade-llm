@@ -1,6 +1,7 @@
 import logging
 import operator
-from typing import Union, Annotated, List, Tuple
+import uuid
+from typing import Union, Annotated, List, Tuple,get_type_hints
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -63,6 +64,7 @@ class PlanExecute(TypedDict):
     answers_list: List
     tool_num: int
     task: str
+    node_id: uuid.UUID
 
 
 class Plan(BaseModel):
@@ -166,9 +168,10 @@ class PlanningBehaviour(MessageHandlingBehavior):
 
             t = state["past_steps"] + ["На запрос:" + state["task"] + "\nОтвет:" + agent_response]
             return {"llm_invoke": answer, "iteration_num": state["iteration_num"] + 1, "tool_num": 0, "task": plan[0],
-                    "past_steps": t}
+                    "past_steps": t, "node_id": uuid.uuid4()}
 
-        return {"llm_invoke": answer, "iteration_num": state["iteration_num"] + 1, "tool_num": 0, "task": plan[0]}
+        return {"llm_invoke": answer, "iteration_num": state["iteration_num"] + 1, "tool_num": 0, "task": plan[0],
+                "node_id": uuid.uuid4()}
 
     async def tool_step(self, state: PlanExecute):
         tool_call = state["llm_invoke"].tool_calls[state["tool_num"]]
@@ -182,7 +185,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
         else:
             logger.warning("Tool %s not found", tool_name)
             agent_response = f"Tool requested by model not found {tool_name}"
-        return {"tool_num": state["tool_num"] + 1}
+        return {"tool_num": state["tool_num"] + 1, "node_id": uuid.uuid4()}
 
     def agent_switch(self, state: PlanExecute):
         if state["iteration_num"] < self.max_iterations and (
@@ -201,7 +204,7 @@ class PlanningBehaviour(MessageHandlingBehavior):
                 "tools": self.tools_dict,
             }
         )
-        return {"plan": plan.steps, "iteration_num": 0, "answers_list": []}
+        return {"plan": plan.steps, "iteration_num": 0, "answers_list": [], "node_id": uuid.uuid4()}
 
     async def replan_step(self, state: PlanExecute):
         replanner_dict = state.copy()
@@ -214,9 +217,10 @@ class PlanningBehaviour(MessageHandlingBehavior):
             result = replan_decision.action.response
             self.logger.info("Got result %s", result)
             await self.context.reply_with_inform(state["input"]).with_content(result)
-            return {"response": replan_decision.action.response}
+            return {"response": replan_decision.action.response, "node_id": uuid.uuid4()}
         else:
-            return {"plan": replan_decision.action.steps, "iteration_num": 0, "answers_list": []}
+            return {"plan": replan_decision.action.steps, "iteration_num": 0, "answers_list": [],
+                    "node_id": uuid.uuid4()}
 
     def should_end(self, state: PlanExecute):
         if "response" in state and state["response"]:
@@ -295,10 +299,35 @@ class ExecuteLangGraphBehaviour(ContextBehaviour):
         for k, v in snapshot.values.items():
             await self.context.put_item(k, v)
 
+    async def state_from_context(self, graph):
+        snapshot_config = {"configurable": {"thread_id": self.context.thread_id}}
+        snapshot = graph.get_state(snapshot_config)
+
+        for key in set(snapshot.values.keys()) |  set(get_type_hints(PlanExecute).keys()):
+            value = await self.context.get_item(key)
+            if value is not None:
+                # Update the state with the value from the context
+                graph.update_state(snapshot_config,{key: value})
+
+    async def get_current_node_id(self, graph):
+        snapshot_config = {"configurable": {"thread_id": self.context.thread_id}}
+        snapshot = graph.get_state(snapshot_config)
+        if "node_id" in snapshot.values.keys():
+            return snapshot.values["node_id"]
+        return None
+
     async def step(self):
         try:
             event = await self.iterator.__anext__()
-            await self.state_to_context(self.app)
+            previous_node_id = await self.context.get_item('node_id')
+            current_node_id = await self.get_current_node_id(self.app)
+            # If step was interrupted, id`s will be the same in context storage and in current state.
+            if previous_node_id == current_node_id:
+                # So we need to update context with new state.
+                await self.state_from_context(self.app)
+            else:
+                # Otherwise, we need to update context with new state. (step was completed successfully)
+                await self.state_to_context(self.app)
         except StopAsyncIteration:
             self.set_is_done()
 
