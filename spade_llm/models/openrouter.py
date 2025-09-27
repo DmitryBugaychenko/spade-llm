@@ -21,11 +21,6 @@ class OpenRouterChatModel(ChatOpenAI):
     def __init__(self, **kwargs):
         # Ensure the base URL is set to OpenRouter
         kwargs.setdefault('openai_api_base', 'https://openrouter.ai/api/v1')
-        # Set default headers for OpenRouter
-        headers = kwargs.get('default_headers', {})
-        headers.setdefault('HTTP-Referer', 'https://github.com/spade-llm/spade-llm')
-        headers.setdefault('X-Title', 'SPADE-LLM')
-        kwargs['default_headers'] = headers
         
         # Map openrouter_api_key to openai_api_key for compatibility with ChatOpenAI
         if 'openrouter_api_key' in kwargs:
