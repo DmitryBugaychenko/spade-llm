@@ -80,7 +80,7 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
                  task: str,
                  context: AgentContext,
                  time_to_wait_for_proposals: float = 10,
-                 time_to_wait_for_result: float = 20):
+                 time_to_wait_for_result: float = 60):
         super().__init__(context)
         self.time_to_wait_for_proposals = time_to_wait_for_proposals
         self.time_to_wait_for_result = time_to_wait_for_result
