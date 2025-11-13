@@ -1,0 +1,39 @@
+# Configuration of the messaging system. For demo internal in-memory messaging is used
+messaging:
+  type_name: spade_llm.core.messaging.DictionaryMessageService
+# Configuration of the agent state storage. For demo internal in-memory storage is used
+storage:
+  type_name: spade_llm.core.storage.InMemoryStorageFactory
+# Agents to host in the system
+agents:
+  # Console agent which listens for commands from console and sends them to the delegate agent
+  sender1_agent:
+    type_name: tests.test_concurrent_messaging.agents.SenderAgent
+    args:
+      agent_number: 1
+  sender2_agent:
+    type_name: tests.test_concurrent_messaging.agents.SenderAgent
+    args:
+      agent_number: 2
+  sender3_agent:
+    type_name: tests.test_concurrent_messaging.agents.SenderAgent
+    args:
+      agent_number: 3
+  sender4_agent:
+    type_name: tests.test_concurrent_messaging.agents.SenderAgent
+    args:
+      agent_number: 4
+  sender5_agent:
+    type_name: tests.test_concurrent_messaging.agents.SenderAgent
+    args:
+      agent_number: 5
+
+  receiver_agent:
+    type_name: tests.test_concurrent_messaging.agents.ReceiverAgent
+  console:
+    type_name: spade_llm.agents.console.ConsoleAgent
+    args:
+      delegate_type: receiver_agent
+      prompt: Нажмите Enter
+      timeout: 200
+wait_for_agents: [console]
