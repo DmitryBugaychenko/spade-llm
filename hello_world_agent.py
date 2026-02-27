@@ -1,21 +1,23 @@
 import asyncio
 import logging
 from spade_llm.core.agent import Agent
-from spade_llm.core.behaviors import MessageHandlingBehavior
-from spade_llm.core.api import Message, AgentContext
+from spade_llm.core.behaviors import Behaviour
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-class HelloWorldBehavior(MessageHandlingBehavior):
+
+class HelloWorldBehavior(Behaviour):
     """
-    A simple behavior that prints 'Hello World' when executed.
+    A simple one-shot behavior that prints 'Hello World' when executed.
     """
     
-    async def handle_message(self, context: AgentContext, message: Message):
+    async def run(self):
+        """
+        Run the behavior - prints Hello World once.
+        """
         print("Hello World!")
-        # You can also reply to the sender
-        # await context.send_message(to=message.sender, body="Hello World!")
+        self._is_done = True  # Mark as done for one-shot execution
 
 
 class HelloWorldAgent(Agent):
@@ -39,11 +41,7 @@ async def main():
     # Create the agent
     agent = HelloWorldAgent(agent_type="hello_world_agent")
     
-    # Create a simple context (this would need a real implementation in production)
-    # For demonstration purposes, we'll just start the agent
-    # In a real scenario, you would provide a proper AgentContext
-    
-    # Note: You'll need to implement or provide a real AgentContext
+    # Note: You'll need to provide a proper AgentContext to start the agent
     # For now, this is a template showing how to structure the agent
     
     print("Hello World Agent created successfully!")
