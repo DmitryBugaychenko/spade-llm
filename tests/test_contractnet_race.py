@@ -39,6 +39,20 @@ class RandomEstimateResponder(ContractNetResponder):
         return ContractNetRequest(task=f"Executed by {self.agent_jid}")
 
 
+class RandomEstimateResponderAgent(DummyAgent):
+    """An agent that hosts a single ContractNetResponderBehavior with RandomEstimateResponder."""
+
+    def __init__(self, jid: str, password: str):
+        super().__init__(jid=jid, password=password)
+        self._jid_str = jid
+
+    async def setup(self) -> None:
+        await super().setup()
+        responder = RandomEstimateResponder(self._jid_str)
+        behavior = ContractNetResponderBehavior(responder)
+        self.add_behaviour(behavior, Templates.REQUEST_PROPOSAL())
+
+
 class FixedAgentsInitiatorBehavior(ContractNetInitiatorBehavior):
     """
     A subclass of ContractNetInitiatorBehavior that returns a fixed set of
@@ -90,9 +104,7 @@ class ContractNetRaceConditionTest(SpadeTestCase):
                     description=f"Responder agent {i} that handles tasks",
                 )
             )
-            agent = RandomEstimateResponder(jid)
-            behavior = ContractNetResponderBehavior(responder)
-            agent.add_behaviour(behavior, Templates.CFP() if hasattr(Templates, 'CFP') else Templates.REQUEST_PROPOSAL())
+            agent = RandomEstimateResponderAgent(jid=jid, password="pwd")
             SpadeTestCase.startAgent(agent)
             cls.responder_agents.append(agent)
 
