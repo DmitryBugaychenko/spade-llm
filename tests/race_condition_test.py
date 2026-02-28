@@ -4,34 +4,42 @@ import unittest
 
 from spade_llm.builders import MessageBuilder
 from spade_llm.consts import Templates
-from spade_llm.core.behaviors import MessageTemplate
-from tests.base import SpadeTestCase, ModelTestCase, DummyAgent
+from spade_llm.core.behaviors import MessageTemplate, Behaviour
+from spade_llm.core.agent import Agent
+from tests.base import SpadeTestCase, ModelTestCase
 
 
 ECHO_AGENT = "echo@localhost"
 SENDER_AGENT = "sender@localhost"
 
 
-class EchoAgent(DummyAgent):
+class EchoAgent(Agent):
     """
     An agent that echoes back any message it receives.
     """
-    pass
+    def setup(self):
+        # Add a behavior to handle and echo messages
+        from spade_llm.core.behaviors import MessageHandlingBehavior
+        from spade_llm.core.api import AgentContext, Message
+        
+        class EchoBehavior(MessageHandlingBehavior):
+            async def handle_message(self, context: AgentContext, message: Message):
+                # Echo back the same message
+                reply = MessageBuilder.inform().to_agent(str(message.sender)).with_content(message.body).build()
+                await context.send_message(reply)
+        
+        self.add_behaviour(EchoBehavior())
 
 
-class SenderAgent(DummyAgent):
+class SenderAgent(Agent):
     """
     An agent that sends a message, waits, and then tries to receive the reply.
     """
     def __init__(self, jid: str, password: str):
-        super().__init__(jid, password)
+        super().__init__(agent_type=jid)
+        self.jid = jid
+        self.password = password
         self.received_reply = None
-
-    async def on_message(self, message):
-        """
-        Store the received reply.
-        """
-        self.received_reply = message
 
 
 class RaceConditionTestCase(SpadeTestCase, ModelTestCase):
@@ -48,7 +56,7 @@ class RaceConditionTestCase(SpadeTestCase, ModelTestCase):
         SpadeTestCase.setUpClass()
         
         # Start the echo agent
-        echo = EchoAgent(jid=ECHO_AGENT, password="pwd")
+        echo = EchoAgent(agent_type=ECHO_AGENT)
         RaceConditionTestCase.echo = echo
         SpadeTestCase.startAgent(echo)
         
@@ -74,27 +82,7 @@ class RaceConditionTestCase(SpadeTestCase, ModelTestCase):
         The bug is that if the reply arrives before receive is called,
         it gets lost.
         """
-        # Import here to avoid circular imports
-        from spade_llm.core.behaviors import MessageHandlingBehavior
-        from spade_llm.core.api import AgentContext
-        
-        # Create a behavior that sends a message, waits, then receives
-        class SendWaitReceiveBehavior(MessageHandlingBehavior):
-            def __init__(self):
-                template = MessageTemplate.from_agent(ECHO_AGENT)
-                super().__init__(template=template)
-                self.sent_message = False
-                self.received_reply = None
-                self.reply_event = None
-
-            async def handle_message(self, context: AgentContext, message):
-                # This should not be called in this test
-                pass
-        
         # Create a simple behavior that sends and waits for reply
-        from spade_llm.consts import Templates
-        from spade_llm.core.behaviors import Behaviour
-        
         class SendAndWaitBehavior(Behaviour):
             def __init__(self):
                 self.received_reply = None
