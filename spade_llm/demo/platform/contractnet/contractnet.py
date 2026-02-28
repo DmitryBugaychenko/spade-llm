@@ -138,24 +138,22 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
             return list()
 
     async def get_proposals(self, agents: list[AgentDescription]) -> list[ContractNetProposal]:
-        sent: set[str] = set()
-        received: set[str] = set()
-        result: list[ContractNetProposal] = list()
+        # Register the collector before sending requests to avoid race conditions
+        collect_task = self.collect(
+            MessageTemplate(performative=consts.PROPOSE, thread_id=self.context.thread_id),
+            count=len(agents),
+            timeout=self.time_to_wait_for_proposals,
+        )
 
         request = ContractNetRequest(task=self.task)
         for agent in agents:
-            sent.add(agent.id)
             await (self.context.request_proposal(agent.id).with_content(request))
-        started = time.time()
 
-        deadline = started + self.time_to_wait_for_proposals
-        while len(received) < len(sent) and time.time() < deadline:
-            response = await self.receive(
-                MessageTemplate(performative=consts.PROPOSE, thread_id=self.context.thread_id),
-                max(0.1, deadline - time.time()))
-            if response:
-                received.add(str(response.sender))
-                result.append(ContractNetProposal.model_validate_json(response.content))
+        collected_messages = await collect_task
+
+        result: list[ContractNetProposal] = []
+        for msg in collected_messages:
+            result.append(ContractNetProposal.model_validate_json(msg.content))
 
         return result
 
