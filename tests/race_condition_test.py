@@ -31,6 +31,39 @@ class EchoAgent(Agent):
         self.add_behaviour(EchoBehavior(MessageTemplate.inform()))
 
 
+class SendAndWaitBehavior(Behaviour):
+    """
+    A behavior that sends a message, waits, and then tries to receive the reply.
+    Used to test the race condition in Behaviour receive method.
+    """
+    def __init__(self):
+        self.received_reply = None
+        self._is_done = False
+    
+    async def run(self):
+        # Send a message to echo agent
+        msg = MessageBuilder.request().to_agent(ECHO_AGENT).with_content("Hello").build()
+        await self.context.send_message(msg)
+        
+        # Wait for a short time (this simulates processing delay)
+        # During this time, the echo agent will reply
+        await asyncio.sleep(0.5)
+        
+        # Now try to receive the reply
+        # This is where the race condition occurs - if reply arrived
+        # before this call, it will be lost
+        try:
+            reply = await self.context.receive(timeout=5)
+            self.received_reply = reply
+        except Exception as e:
+            print(f"Error receiving reply: {e}")
+        
+        self._is_done = True
+    
+    def is_done(self):
+        return self._is_done
+
+
 class SenderAgent(Agent):
     """
     An agent that sends a message, waits, and then tries to receive the reply.
@@ -40,6 +73,11 @@ class SenderAgent(Agent):
         self.jid = jid
         self.password = password
         self.received_reply = None
+
+    def setup(self):
+        # Add the behavior that sends and waits for reply
+        behavior = SendAndWaitBehavior()
+        self.add_behaviour(behavior)
 
 
 class RaceConditionTestCase(SpadeTestCase, ModelTestCase):
@@ -82,38 +120,8 @@ class RaceConditionTestCase(SpadeTestCase, ModelTestCase):
         The bug is that if the reply arrives before receive is called,
         it gets lost.
         """
-        # Create a simple behavior that sends and waits for reply
-        class SendAndWaitBehavior(Behaviour):
-            def __init__(self):
-                self.received_reply = None
-                self._is_done = False
-            
-            async def run(self):
-                # Send a message to echo agent
-                msg = MessageBuilder.request().to_agent(ECHO_AGENT).with_content("Hello").build()
-                await self.context.send_message(msg)
-                
-                # Wait for a short time (this simulates processing delay)
-                # During this time, the echo agent will reply
-                await asyncio.sleep(0.5)
-                
-                # Now try to receive the reply
-                # This is where the race condition occurs - if reply arrived
-                # before this call, it will be lost
-                try:
-                    reply = await self.context.receive(timeout=5)
-                    self.received_reply = reply
-                except Exception as e:
-                    print(f"Error receiving reply: {e}")
-                
-                self._is_done = True
-            
-            def is_done(self):
-                return self._is_done
-
-        # Add the behavior to sender agent
-        behavior = SendAndWaitBehavior()
-        self.sender.add_behaviour(behavior)
+        # Get the behavior from the sender agent
+        behavior = self.sender._behaviors[0]
         
         # Wait for the behavior to complete
         self.run_in_container(behavior.join(10))
