@@ -90,8 +90,7 @@ class ContractNetRaceConditionTest(SpadeTestCase):
                     description=f"Responder agent {i} that handles tasks",
                 )
             )
-            agent = DummyAgent(jid=jid, password="pwd")
-            responder = RandomEstimateResponder(jid)
+            agent = RandomEstimateResponder(jid)
             behavior = ContractNetResponderBehavior(responder)
             agent.add_behaviour(behavior, Templates.CFP() if hasattr(Templates, 'CFP') else Templates.REQUEST_PROPOSAL())
             SpadeTestCase.startAgent(agent)
