@@ -1,8 +1,10 @@
+import asyncio
 import time
 import unittest
 
 from spade_llm.builders import MessageBuilder
 from spade_llm.consts import Templates
+from spade_llm.core.behaviors import MessageTemplate
 from tests.base import SpadeTestCase, ModelTestCase, DummyAgent
 
 
