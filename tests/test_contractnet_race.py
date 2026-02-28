@@ -21,6 +21,8 @@ from spade_llm.contractnet import (
     ContractNetResponderBehavior,
     ContractNetInitiatorBehavior,
 )
+from spade_llm.core.agent import Agent
+from spade_llm.core.behaviors import MessageTemplate
 from spade_llm.discovery import (
     AgentDescription,
     AgentSearchRequest,
@@ -53,22 +55,14 @@ class RandomEstimateResponder(ContractNetResponder):
         return ContractNetRequest(task=f"Executed by {self.agent_jid}")
 
 
-class ResponderAgent(SpadeAgent):
-    """A simple agent that hosts a ContractNetResponderBehavior."""
+class ResponderAgent(Agent):
 
-    def __init__(self, jid, password, description: str):
-        super().__init__(jid, password)
-        self._description = description
 
     async def setup(self):
         responder = RandomEstimateResponder(str(self.jid))
         behavior = ContractNetResponderBehavior(responder)
-        self.add_behaviour(behavior, Templates.CFP())
+        self.add_behaviour(behavior)
 
-
-class DummyAgent(SpadeAgent):
-    async def setup(self):
-        pass
 
 
 class ContractNetRaceConditionTest(SpadeTestCase):
