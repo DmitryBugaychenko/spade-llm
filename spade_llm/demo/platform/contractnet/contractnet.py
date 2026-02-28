@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from spade_llm import consts
 from pydantic import BaseModel, Field
-from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
+from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour, \
+    MessageCollectorBehavior
 from spade_llm.core.api import AgentContext
 from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest, \
     DF_ADDRESS
@@ -138,21 +139,30 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
             return list()
 
     async def get_proposals(self, agents: list[AgentDescription]) -> list[ContractNetProposal]:
-        # Register the collector before sending requests to avoid race conditions
-        collect_task = self.collect(
+        # Add collector behavior before sending requests to avoid race conditions
+        collector = MessageCollectorBehavior(
             MessageTemplate(performative=consts.PROPOSE, thread_id=self.context.thread_id),
-            count=len(agents),
-            timeout=self.time_to_wait_for_proposals,
+            expected_count=len(agents),
         )
+        self.agent.add_behaviour(collector)
 
+        # Send all requests for proposals
         request = ContractNetRequest(task=self.task)
         for agent in agents:
             await (self.context.request_proposal(agent.id).with_content(request))
 
-        collected_messages = await collect_task
+        # Now join the collector with timeout
+        try:
+            await asyncio.wait_for(collector.join(), self.time_to_wait_for_proposals)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Timed out waiting for proposals: collected %d of %d",
+                len(collector.messages), len(agents),
+            )
+            self.agent.remove_behaviour(collector)
 
         result: list[ContractNetProposal] = []
-        for msg in collected_messages:
+        for msg in collector.messages:
             result.append(ContractNetProposal.model_validate_json(msg.content))
 
         return result
