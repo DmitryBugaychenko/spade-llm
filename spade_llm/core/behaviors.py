@@ -257,6 +257,27 @@ class Behaviour(metaclass=ABCMeta):
             self.agent.remove_behaviour(receiver)
             return None
 
+    def collect(self, template: MessageTemplate, count: int, timeout: float) -> "asyncio.Task[list[Message]]":
+        """
+        Starts collecting the specified number of messages matching the template.
+        Returns an asyncio Task that resolves to the list of collected messages.
+        :param template: Template for messages to collect
+        :param count: Number of messages to collect
+        :param timeout: Maximum waiting time for all messages
+        :return: asyncio Task resolving to list of collected messages
+        """
+        collector = MessageCollectorBehavior(template, count)
+        self.agent.add_behaviour(collector)
+
+        async def _collect():
+            try:
+                await asyncio.wait_for(collector.join(), timeout)
+            except asyncio.TimeoutError:
+                self.agent.remove_behaviour(collector)
+            return list(collector.messages)
+
+        return asyncio.ensure_future(_collect())
+
     @property
     def logger(self) -> logging.Logger:
         return self._logger
@@ -342,3 +363,49 @@ class ReceiverBehavior(MessageHandlingBehavior):
 
     def is_done(self) -> bool:
         return self.message is not None
+
+
+class MessageCollectorBehavior(MessageHandlingBehavior):
+    """
+    Accumulates a requested number of messages before completing.
+    Unlike ReceiverBehavior which completes after a single message,
+    this behavior keeps accepting messages until the expected count is reached.
+    """
+
+    def __init__(self, template: MessageTemplate, expected_count: int):
+        """
+        :param template: Template for messages to collect
+        :param expected_count: Number of messages to collect before the behavior is done
+        """
+        if expected_count < 1:
+            raise ValueError("expected_count must be at least 1")
+        super().__init__(template)
+        self._expected_count = expected_count
+        self._messages: list[Message] = []
+
+    @property
+    def messages(self) -> list[Message]:
+        """
+        Returns the list of collected messages so far.
+        """
+        return self._messages
+
+    @property
+    def expected_count(self) -> int:
+        """
+        Returns the number of messages expected to collect.
+        """
+        return self._expected_count
+
+    async def step(self):
+        """
+        Appends the received message to the collected list.
+        """
+        if self._message is not None:
+            self._messages.append(self._message)
+
+    def is_done(self) -> bool:
+        """
+        Returns True only when the expected number of messages has been collected.
+        """
+        return len(self._messages) >= self._expected_count
