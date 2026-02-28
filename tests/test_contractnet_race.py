@@ -6,6 +6,8 @@ from typing import Optional
 from pydantic import BaseModel
 from spade.message import Message
 
+from spade_llm.core.api import AgentContext
+from spade_llm.core.behaviors import MessageTemplate
 from spade_llm.demo.platform.contractnet.contractnet import (
     ContractNetRequest,
     ContractNetProposal,
@@ -21,31 +23,22 @@ from tests.test_utils import TestPlatform, AgentEntry
 NUM_RESPONDERS = 5
 
 
-class RandomEstimateResponder(ContractNetResponder):
-    """A responder that returns a random estimate for any request."""
-
-    def __init__(self, agent_id: str):
-        self.agent_id = agent_id
-
+class RandomEstimateResponderAgent(Agent, ContractNetResponder):
+    """An agent that hosts a single ContractNetResponderBehavior with RandomEstimateResponder."""
     async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
         estimate = random.uniform(1.0, 100.0)
         return ContractNetProposal(
-            author=self.agent_id,
+            author=self.agent_type,
             request=request,
             estimate=estimate,
         )
 
     async def execute(self, proposal: ContractNetProposal, msg: Message) -> BaseModel:
-        return ContractNetRequest(task=f"Executed by {self.agent_id}")
+        return ContractNetRequest(task=f"Executed by {self.agent_type}")
 
-
-class RandomEstimateResponderAgent(Agent):
-    """An agent that hosts a single ContractNetResponderBehavior with RandomEstimateResponder."""
-
-    async def setup(self) -> None:
-        await super().setup()
-        responder = RandomEstimateResponder(self.agent_type)
-        behavior = ContractNetResponderBehavior(responder)
+    def setup(self) -> None:
+        super().setup()
+        behavior = ContractNetResponderBehavior(self)
         self.add_behaviour(behavior)
 
 
@@ -55,46 +48,40 @@ class FixedAgentsInitiatorBehavior(ContractNetInitiatorBehavior):
     responder agents from find_agents instead of querying the DF.
     """
 
-    def __init__(self, task: str, agents: list[AgentDescription], **kwargs):
-        super().__init__(task, **kwargs)
+    def __init__(self, task: str, agents: list[AgentDescription], context: AgentContext):
+        super().__init__(task, context)
+        self.collected_proposals = []
         self._fixed_agents = agents
 
     async def find_agents(self, task: str) -> list[AgentDescription]:
         return self._fixed_agents
 
+    async def extract_winner_and_notify_losers(self, proposals: list[ContractNetProposal]) -> ContractNetProposal:
+        self.collected_proposals = proposals
+        return await super().extract_winner_and_notify_losers(proposals)
 
-class CollectingInitiatorBehavior(FixedAgentsInitiatorBehavior):
-    """
-    An initiator behavior that captures collected proposals for test assertions.
-    """
-
-    def __init__(self, task: str, agents: list[AgentDescription], **kwargs):
-        super().__init__(task, agents, **kwargs)
-        self.collected_proposals: list[ContractNetProposal] = []
-
-    async def run(self):
-        agents = await self.find_agents(self.task)
-        proposals = await self.get_proposals(agents)
-        self.collected_proposals.extend(proposals)
-
-        if len(proposals) > 0:
-            self.proposal = await self.extract_winner_and_notify_losers(proposals)
-            if self.proposal:
-                self.result = await self.get_result(self.proposal)
-
-        self.kill()
+    async def get_result(self, proposal: ContractNetProposal) -> Optional[MessageTemplate]:
+        result = await super().get_result(proposal)
+        self.agent.stop()
+        return result
 
 
 class InitiatorAgent(Agent):
     """An agent that hosts a CollectingInitiatorBehavior."""
 
-    def __init__(self, agent_type: str, initiator_behavior: CollectingInitiatorBehavior):
+    def __init__(self, agent_type: str, agents: list[AgentDescription]):
         super().__init__(agent_type=agent_type)
-        self._initiator_behavior = initiator_behavior
+        self._initiator_behavior = None
+        self._agents = agents
 
-    async def setup(self) -> None:
-        await super().setup()
+    def setup(self) -> None:
+        super().setup()
+        self._initiator_behavior = FixedAgentsInitiatorBehavior(
+            "Handle a generic task", self._agents, self.default_context)
         self.add_behaviour(self._initiator_behavior)
+
+    def get_proposals(self) -> list[ContractNetProposal]:
+        return self._initiator_behavior.collected_proposals
 
 
 class ContractNetRaceConditionTest(unittest.TestCase):
@@ -126,13 +113,10 @@ class ContractNetRaceConditionTest(unittest.TestCase):
             agent = RandomEstimateResponderAgent(agent_type=agent_id)
             responder_entries.append(AgentEntry(agent=agent))
 
-        initiator_behavior = CollectingInitiatorBehavior(
-            task="Handle a generic task",
-            agents=agent_descriptions,
-        )
+
         initiator_agent = InitiatorAgent(
             agent_type="initiator",
-            initiator_behavior=initiator_behavior,
+            agents=agent_descriptions
         )
         initiator_entry = AgentEntry(agent=initiator_agent)
 
@@ -145,7 +129,7 @@ class ContractNetRaceConditionTest(unittest.TestCase):
 
         asyncio.run(platform.run())
 
-        collected_proposals = initiator_behavior.collected_proposals
+        collected_proposals = initiator_agent.get_proposals()
 
         # THIS IS THE KEY ASSERTION:
         # All responders should have sent proposals, so we expect
