@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from spade_llm.core.agent import Agent
-from spade_llm.core.messaging import InMemoryMessageService
+from spade_llm.core.messaging import DictionaryMessageService
 from spade_llm.core.models import ModelsProvider
 from spade_llm.core.platform import AgentPlatformImpl
 from spade_llm.core.storage import InMemoryStorageFactory
@@ -55,7 +55,7 @@ class TestPlatform:
 
     async def run(self):
         storage_factory = InMemoryStorageFactory()
-        message_service = InMemoryMessageService()
+        message_service = DictionaryMessageService()
         platform = AgentPlatformImpl(storage_factory, message_service, self.models_provider)
 
         agents: dict[str, Agent] = {}
