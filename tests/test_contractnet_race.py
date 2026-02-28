@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import random
 import unittest
 from typing import Optional
@@ -19,6 +20,7 @@ from spade_llm.core.agent import Agent
 from spade_llm.demo.platform.contractnet.discovery import AgentDescription
 from tests.test_utils import TestPlatform, AgentEntry
 
+logging.basicConfig(level=logging.DEBUG)
 
 NUM_RESPONDERS = 5
 
