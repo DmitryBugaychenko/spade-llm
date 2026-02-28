@@ -25,10 +25,10 @@ class EchoAgent(Agent):
         class EchoBehavior(MessageHandlingBehavior):
             async def handle_message(self, context: AgentContext, message: Message):
                 # Echo back the same message
-                reply = MessageBuilder.inform().to_agent(str(message.sender)).with_content(message.body).build()
-                await context.send_message(reply)
+                reply = MessageBuilder.inform().to_agent(str(message.sender)).with_content(message.body)
+                await context.send(reply)
         
-        self.add_behaviour(EchoBehavior())
+        self.add_behaviour(EchoBehavior(MessageTemplate.inform()))
 
 
 class SenderAgent(Agent):
