@@ -6,16 +6,16 @@ from typing import Optional
 from pydantic import BaseModel
 from spade.message import Message
 
-from spade_llm.consts import Templates
-from spade_llm.contractnet import (
+from spade_llm.demo.platform.contractnet.contractnet import (
     ContractNetRequest,
     ContractNetProposal,
     ContractNetResponder,
     ContractNetResponderBehavior,
     ContractNetInitiatorBehavior,
 )
-from spade_llm.discovery import AgentDescription
-from tests.base import SpadeTestCase, DummyAgent
+from spade_llm.core.agent import Agent
+from spade_llm.demo.platform.contractnet.discovery import AgentDescription
+from tests.base import SpadeTestCase
 
 
 NUM_RESPONDERS = 5
@@ -24,33 +24,29 @@ NUM_RESPONDERS = 5
 class RandomEstimateResponder(ContractNetResponder):
     """A responder that returns a random estimate for any request."""
 
-    def __init__(self, agent_jid: str):
-        self.agent_jid = agent_jid
+    def __init__(self, agent_id: str):
+        self.agent_id = agent_id
 
     async def estimate(self, request: ContractNetRequest, msg: Message) -> Optional[ContractNetProposal]:
         estimate = random.uniform(1.0, 100.0)
         return ContractNetProposal(
-            author=self.agent_jid,
+            author=self.agent_id,
             request=request,
             estimate=estimate,
         )
 
     async def execute(self, proposal: ContractNetProposal, msg: Message) -> BaseModel:
-        return ContractNetRequest(task=f"Executed by {self.agent_jid}")
+        return ContractNetRequest(task=f"Executed by {self.agent_id}")
 
 
-class RandomEstimateResponderAgent(DummyAgent):
+class RandomEstimateResponderAgent(Agent):
     """An agent that hosts a single ContractNetResponderBehavior with RandomEstimateResponder."""
-
-    def __init__(self, jid: str, password: str):
-        super().__init__(jid=jid, password=password)
-        self._jid_str = jid
 
     async def setup(self) -> None:
         await super().setup()
-        responder = RandomEstimateResponder(self._jid_str)
+        responder = RandomEstimateResponder(self.agent_type)
         behavior = ContractNetResponderBehavior(responder)
-        self.add_behaviour(behavior, Templates.REQUEST_PROPOSAL())
+        self.add_behaviour(behavior)
 
 
 class FixedAgentsInitiatorBehavior(ContractNetInitiatorBehavior):
@@ -59,18 +55,11 @@ class FixedAgentsInitiatorBehavior(ContractNetInitiatorBehavior):
     responder agents from find_agents instead of querying the DF.
     """
 
-    def __init__(self, task: str, agents: list[AgentDescription],
-                 thread: str = str(uuid.uuid4()),
-                 time_to_wait_for_proposals: float = 10):
-        super().__init__(
-            task=task,
-            df_address="unused",
-            thread=thread,
-            time_to_wait_for_proposals=time_to_wait_for_proposals,
-        )
+    def __init__(self, agents: list[AgentDescription]):
+        super().__init__(self)
         self._fixed_agents = agents
 
-    async def find_agents(self, task: str, df_address: str) -> list[AgentDescription]:
+    async def find_agents(self, task: str) -> list[AgentDescription]:
         return self._fixed_agents
 
 
@@ -85,7 +74,6 @@ class ContractNetRaceConditionTest(SpadeTestCase):
     """
 
     responder_agents = []
-    responder_jids = []
     agent_descriptions = []
 
     @classmethod
@@ -93,18 +81,16 @@ class ContractNetRaceConditionTest(SpadeTestCase):
         SpadeTestCase.setUpClass()
 
         cls.responder_agents = []
-        cls.responder_jids = []
         cls.agent_descriptions = []
         for i in range(NUM_RESPONDERS):
-            jid = f"responder{i}@localhost"
-            cls.responder_jids.append(jid)
+            id = f"responder/{i}"
             cls.agent_descriptions.append(
                 AgentDescription(
-                    id=jid,
+                    id=id,
                     description=f"Responder agent {i} that handles tasks",
                 )
             )
-            agent = RandomEstimateResponderAgent(jid=jid, password="pwd")
+            agent = RandomEstimateResponderAgent("responder")
             SpadeTestCase.startAgent(agent)
             cls.responder_agents.append(agent)
 
