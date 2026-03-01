@@ -1,6 +1,8 @@
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
+
+from pydantic import BaseModel
 
 from spade_llm.core.agent import Agent
 from spade_llm.core.messaging import DictionaryMessageService
@@ -16,7 +18,7 @@ class AgentEntry:
     agent: Agent
     tools: list[Any] = field(default_factory=list)
     contacts: list[DelegateToolConfig] = field(default_factory=list)
-    configuration: Any = None
+    configuration: Optional[BaseModel] = None
 
 
 class TestPlatform:
