@@ -2,7 +2,7 @@ import queue
 import time
 from typing import List, Callable, Any, Optional
 from spade_llm.core.agent import Agent
-from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
+from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.builders import MessageBuilder
 from spade_llm.core.api import Message, AgentContext
 import logging
@@ -22,14 +22,13 @@ class AccumulateMessagesBehavior(MessageHandlingBehavior):
             await self.context.reply_with_acknowledge(self.message).with_content("")
 
 
-class ExecuteContextLambdaBehavior(MessageHandlingBehavior):
+class ExecuteContextLambdaBehavior(ContextBehaviour):
     """Behavior for executing a lambda expression over the agent's default context"""
     
-    def __init__(self, func: Callable[[AgentContext], Any], future: Any):
-        super().__init__(None)  # No template, one-time use
+    def __init__(self, func: Callable[[AgentContext], Any], future: Any, context: AgentContext):
+        super().__init__(context)  # No template, one-time use
         self.func = func
         self.future = future
-        self.logger = logging.getLogger(__name__)
     
     async def step(self):
         try:
@@ -99,6 +98,6 @@ class DummyAgent(Agent):
         """
         import concurrent.futures
         future = concurrent.futures.Future()
-        execute_behavior = ExecuteContextLambdaBehavior(func, future)
+        execute_behavior = ExecuteContextLambdaBehavior(func, future, self.default_context)
         self.add_behaviour(execute_behavior)
         return future
