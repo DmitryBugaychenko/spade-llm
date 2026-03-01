@@ -9,7 +9,6 @@ from spade_llm.builders import MessageBuilder
 from spade_llm.consts import Templates
 from spade_llm.patterns.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
     AgentSearchResponse
-from spade_llm.core.api import Message
 from tests.test_utils import TestPlatform, AgentEntry
 
 
@@ -134,9 +133,9 @@ class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
         
         # Register agents with DF using dummy agent
         def register_agents(context):
-            context.send_message(MessageBuilder.inform().to_agent(self.df_agent).with_content(math))
-            context.send_message(MessageBuilder.inform().to_agent(self.df_agent).with_content(search))
-            context.send_message(MessageBuilder.inform().to_agent(self.df_agent).with_content(travel))
+            context.inform(self.df_agent).with_content(math)
+            context.inform(self.df_agent).with_content(search)
+            context.inform(self.df_agent).with_content(travel)
         
         future = self.dummy_agent.as_agent(register_agents)
         future.result(timeout=10)  # Wait for registration to complete
@@ -147,8 +146,7 @@ class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
 
     def search_foragent(self, query: str) -> AgentSearchResponse:
         def send_search_request(context):
-            future = context.create_message_builder("request") \
-                .to_agent(self.df_agent) \
+            future = context.request(self.df_agent) \
                 .with_content(AgentSearchRequest(task=query)) \
                 .send_and_receive(Templates.INFORM())
             return AgentSearchResponse.model_validate_json(future.result().content)
