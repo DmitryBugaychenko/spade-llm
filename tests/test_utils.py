@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 from pydantic import BaseModel
 
@@ -19,6 +19,20 @@ class AgentEntry:
     tools: list[Any] = field(default_factory=list)
     contacts: list[DelegateToolConfig] = field(default_factory=list)
     configuration: Optional[BaseModel] = None
+
+
+class SimpleModelsProvider(ModelsProvider):
+    """Simple implementation of ModelsProvider using dictionaries"""
+    
+    def __init__(self, chat_models: Dict[str, Any], embedding_models: Dict[str, Any]):
+        self.chat_models = chat_models or {}
+        self.embedding_models = embedding_models or {}
+    
+    def get_chat_model(self, model_name: str):
+        return self.chat_models.get(model_name)
+    
+    def get_embeddings_model(self, model_name: str):
+        return self.embedding_models.get(model_name)
 
 
 class TestPlatform:
@@ -44,19 +58,22 @@ class TestPlatform:
         self,
         agents: list[AgentEntry],
         wait_for: set[str] | None = None,
-        models_provider: ModelsProvider | None = None,
+        chat_models: Dict[str, Any] | None = None,
+        embedding_models: Dict[str, Any] | None = None,
     ):
         """
         :param agents: List of AgentEntry instances describing agents to register.
         :param wait_for: Set of agent_type names to wait for before shutting down.
                          If None or empty, all agents are awaited.
-        :param models_provider: Optional ModelsProvider; if not provided, a no-op default is used.
+        :param chat_models: Dictionary mapping model names to chat model instances.
+        :param embedding_models: Dictionary mapping model names to embedding model instances.
         """
         self.agents = None
         self.platform = None
         self.agent_entries = agents
         self.wait_for = wait_for or set()
-        self.models_provider = models_provider
+        self.chat_models = chat_models or {}
+        self.embedding_models = embedding_models or {}
 
     async def run(self):
         await self.start()
@@ -75,7 +92,11 @@ class TestPlatform:
     async def start(self):
         storage_factory = InMemoryStorageFactory()
         message_service = DictionaryMessageService()
-        self.platform = AgentPlatformImpl(storage_factory, message_service, self.models_provider)
+        
+        # Create models provider from dictionaries
+        models_provider = SimpleModelsProvider(self.chat_models, self.embedding_models)
+        
+        self.platform = AgentPlatformImpl(storage_factory, message_service, models_provider)
         self.agents: dict[str, Agent] = {}
         for entry in self.agent_entries:
             agent = entry.agent
