@@ -1,5 +1,6 @@
 import queue
-from typing import List, Callable, Any
+import time
+from typing import List, Callable, Any, Optional
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
 from spade_llm.builders import MessageBuilder
@@ -64,6 +65,20 @@ class DummyAgent(Agent):
             except queue.Empty:
                 break
         return messages
+    
+    def get_message(self, timeout: float = 5.0) -> Optional[Message]:
+        """Fetch a single message from the queue with a timeout.
+        
+        Args:
+            timeout: Maximum time to wait for a message in seconds. Defaults to 5.0.
+            
+        Returns:
+            Message if available within timeout, None otherwise.
+        """
+        try:
+            return self.message_queue.get(timeout=timeout)
+        except queue.Empty:
+            return None
     
     def clear_messages(self):
         """Clear accumulated messages"""
