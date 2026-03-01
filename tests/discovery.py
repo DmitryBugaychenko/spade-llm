@@ -1,17 +1,17 @@
+import logging
 import os
 import unittest
-from typing import List
 
 from langchain_gigachat import GigaChatEmbeddings
 
+from spade_llm import consts
 from spade_llm.agents.testing import DummyAgent
-from spade_llm.builders import MessageBuilder
-from spade_llm.consts import Templates
+from spade_llm.core.api import AgentContext
 from spade_llm.patterns.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
-    AgentSearchResponse
+    AgentSearchResponse, DirectoryFacilitatorAgentConf
 from tests.test_utils import TestPlatform, AgentEntry
 
-
+logging.basicConfig(level=logging.DEBUG)
 DF_ADDRESS = "df"
 
 math = AgentDescription(
@@ -112,52 +112,52 @@ travel = AgentDescription(
     ]
 )
 
-
 class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.dummy_agent = DummyAgent("dummy")
-        self.df_agent = DirectoryFacilitatorAgent(
-              agent_type=DF_ADDRESS,
-              embeddings=GigaChatEmbeddings(
-                  credentials=os.environ['GIGA_CRED'],
-                  verify_ssl_certs=False,
-              ))
-        
+
+        self.df_agent = DirectoryFacilitatorAgent(agent_type=DF_ADDRESS)
+
+        embeddings = GigaChatEmbeddings(credentials=os.environ['GIGA_CRED'], verify_ssl_certs=False)
+
         self.platform = TestPlatform(
             agents=[
-                AgentEntry(agent=self.df_agent),
+                AgentEntry(
+                    agent = self.df_agent,
+                    configuration = DirectoryFacilitatorAgentConf(model="test")),
                 AgentEntry(agent=self.dummy_agent),
             ],
-            wait_for={self.dummy_agent.agent_type}
+            wait_for={self.dummy_agent.agent_type},
+            embedding_models={"test" : embeddings}
         )
+
+        await self.platform.start()
         
         # Register agents with DF using dummy agent
-        def register_agents(context):
-            context.inform(self.df_agent).with_content(math)
-            context.inform(self.df_agent).with_content(search)
-            context.inform(self.df_agent).with_content(travel)
+        async def register_agents(context: AgentContext):
+            await context.inform(self.df_agent.agent_type).with_content(math)
+            await context.inform(self.df_agent.agent_type).with_content(search)
+            await context.inform(self.df_agent.agent_type).with_content(travel)
         
-        future = self.dummy_agent.as_agent(register_agents)
-        future.result(timeout=10)  # Wait for registration to complete
+        self.dummy_agent.as_agent(register_agents)
         
         # Wait for 3 ACKNOWLEDGE messages
         for _ in range(3):
-            msg = self.dummy_agent.get_message(timeout=10)
+            msg = self.dummy_agent.get_message(60)
             self.assertIsNotNone(msg, "Expected ACKNOWLEDGE message not received")
-            self.assertEqual(msg.performative, "ACKNOWLEDGE")
+            self.assertEqual(msg.performative, consts.ACKNOWLEDGE)
 
     async def asyncTearDown(self):
         self.dummy_agent.stop()
-        await self.platform.run()
+        await self.platform.stop()
 
     def search_foragent(self, query: str) -> AgentSearchResponse:
-        def send_search_request(context):
-            return context.request(self.df_agent) \
-                .with_content(AgentSearchRequest(task=query)) \
-                .send_and_receive(Templates.INFORM())
+        async def send_search_request(context: AgentContext):
+            await context.request(self.df_agent.agent_type) \
+                .with_content(AgentSearchRequest(task=query))
         
-        future = self.dummy_agent.as_agent(send_search_request)
-        response_message = future.result(timeout=10)
+        self.dummy_agent.as_agent(send_search_request)
+        response_message = self.dummy_agent.get_message()
         return AgentSearchResponse.model_validate_json(response_message.content)
 
     def assertAgent(self, result: AgentSearchResponse, id: str):
