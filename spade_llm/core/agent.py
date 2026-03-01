@@ -245,17 +245,16 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         If called from outside the agent thread, marshals the call to the event loop.
         :param beh: The behavior to add.
         """
+        # Assert that event loop is initialized
+        assert hasattr(self, '_loop'), "Event loop must be initialized before adding behaviors"
+        
         # Check if we're in the agent's thread
-        if hasattr(self, '_loop') and threading.current_thread() == self._thread:
+        if threading.current_thread() == self._thread:
             # We're in the agent's thread, call directly
             self._add_behaviour_internal(beh)
         else:
             # We're not in the agent's thread, marshal the call to the event loop
-            if hasattr(self, '_loop'):
-                self.loop.call_soon_threadsafe(lambda: self._add_behaviour_internal(beh))
-            else:
-                # Agent not started yet, add behavior directly
-                self._add_behaviour_internal(beh)
+            self.loop.call_soon_threadsafe(lambda: self._add_behaviour_internal(beh))
 
     def remove_behaviour(self, beh: Behaviour):
         """
