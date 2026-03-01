@@ -5,7 +5,7 @@ from langchain_gigachat import GigaChatEmbeddings
 
 from spade_llm.builders import MessageBuilder
 from spade_llm.consts import Templates
-from spade_llm.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
+from spade_llm.patterns.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
     AgentSearchResponse
 from tests.base import SpadeTestCase
 
