@@ -207,7 +207,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Runs the event loop in a separate thread.
         """
-        self._loop = asyncio.new_event_loop()
+        self._loop = asyncio.new_eventLoop()
         asyncio.set_event_loop(self.loop)
 
         for beh in self._behaviors:
@@ -227,10 +227,9 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
             self._is_completed.set()
             self.logger.info("Exited agent thread.")
 
-    def add_behaviour(self, beh: Behaviour):
+    def _add_behaviour_internal(self, beh: Behaviour):
         """
-        Adds a behavior to either the dispatcher or the internal list based on its type.
-        :param beh: The behavior to add.
+        Internal method to add behavior. This should only be called from the agent's event loop.
         """
         self._behaviors.append(beh)
         if isinstance(beh, MessageHandlingBehavior):
@@ -239,6 +238,24 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         if self.is_running():
             beh.start()
         self.logger.debug("Added behavior %s to agent %s", beh, self)
+
+    def add_behaviour(self, beh: Behaviour):
+        """
+        Adds a behavior to either the dispatcher or the internal list based on its type.
+        If called from outside the agent thread, marshals the call to the event loop.
+        :param beh: The behavior to add.
+        """
+        # Check if we're in the agent's thread
+        if hasattr(self, '_loop') and threading.current_thread() == self._thread:
+            # We're in the agent's thread, call directly
+            self._add_behaviour_internal(beh)
+        else:
+            # We're not in the agent's thread, marshal the call to the event loop
+            if hasattr(self, '_loop'):
+                self.loop.call_soon_threadsafe(lambda: self._add_behaviour_internal(beh))
+            else:
+                # Agent not started yet, add behavior directly
+                self._add_behaviour_internal(beh)
 
     def remove_behaviour(self, beh: Behaviour):
         """
