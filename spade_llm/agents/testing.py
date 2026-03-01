@@ -1,3 +1,4 @@
+import queue
 from typing import List, Callable, Any
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
@@ -9,13 +10,13 @@ import logging
 class AccumulateMessagesBehavior(MessageHandlingBehavior):
     """Behavior for accumulating all incoming messages"""
     
-    def __init__(self):
+    def __init__(self, message_queue: queue.Queue):
         super().__init__(MessageTemplate())
-        self.messages: List[Message] = []
+        self.message_queue = message_queue
     
     async def step(self):
         if self.message:
-            self.messages.append(self.message)
+            self.message_queue.put(self.message)
             # Send acknowledgment
             await self.context.reply_with_acknowledge(self.message).with_content("")
 
@@ -48,18 +49,29 @@ class DummyAgent(Agent):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.accumulate_behavior = AccumulateMessagesBehavior()
+        self.message_queue = queue.Queue()
+        self.accumulate_behavior = AccumulateMessagesBehavior(self.message_queue)
     
     def setup(self):
         self.add_behaviour(self.accumulate_behavior)
     
     def get_received_messages(self) -> List[Message]:
         """Get all accumulated messages"""
-        return self.accumulate_behavior.messages.copy()
+        messages = []
+        while not self.message_queue.empty():
+            try:
+                messages.append(self.message_queue.get_nowait())
+            except queue.Empty:
+                break
+        return messages
     
     def clear_messages(self):
         """Clear accumulated messages"""
-        self.accumulate_behavior.messages.clear()
+        while not self.message_queue.empty():
+            try:
+                self.message_queue.get_nowait()
+            except queue.Empty:
+                break
     
     def as_agent(self, func: Callable[[AgentContext], Any]):
         """Execute a function over the agent's default context, marshaling execution to the event loop.
