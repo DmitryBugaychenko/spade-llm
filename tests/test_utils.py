@@ -49,34 +49,38 @@ class TestPlatform:
                          If None or empty, all agents are awaited.
         :param models_provider: Optional ModelsProvider; if not provided, a no-op default is used.
         """
+        self.agents = None
+        self.platform = None
         self.agent_entries = agents
         self.wait_for = wait_for or set()
         self.models_provider = models_provider
 
     async def run(self):
+        await self.start()
+
+        await self.stop()
+
+    async def stop(self):
+        if len(self.wait_for) > 0:
+            await self._wait_for_agents([self.agents[a] for a in self.wait_for])
+            for agent_type, agent in self.agents.items():
+                if agent_type not in self.wait_for:
+                    agent.stop()
+        await self._wait_for_agents(list(self.agents.values()))
+        await self.platform.shutdown()
+
+    async def start(self):
         storage_factory = InMemoryStorageFactory()
         message_service = DictionaryMessageService()
-        platform = AgentPlatformImpl(storage_factory, message_service, self.models_provider)
-
-        agents: dict[str, Agent] = {}
-
+        self.platform = AgentPlatformImpl(storage_factory, message_service, self.models_provider)
+        self.agents: dict[str, Agent] = {}
         for entry in self.agent_entries:
             agent = entry.agent
             agent_type = agent.agent_type
-            await platform.register_agent(agent, entry.tools, entry.contacts)
-            agents[agent_type] = agent
-
+            await self.platform.register_agent(agent, entry.tools, entry.contacts)
+            self.agents[agent_type] = agent
         await message_service.start_bridges()
 
-        if len(self.wait_for) > 0:
-            await self._wait_for_agents([agents[a] for a in self.wait_for])
-            for agent_type, agent in agents.items():
-                if agent_type not in self.wait_for:
-                    agent.stop()
-
-        await self._wait_for_agents(list(agents.values()))
-
-        await platform.shutdown()
 
     @staticmethod
     async def _wait_for_agents(agents: list[Agent]):
