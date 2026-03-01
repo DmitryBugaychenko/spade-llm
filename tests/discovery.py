@@ -5,10 +5,10 @@ import unittest
 from langchain_gigachat import GigaChatEmbeddings
 
 from spade_llm import consts
-from spade_llm.agents.testing import DummyAgent
+from spade_llm.agents.testing import DummyAgent, ExecuteInContext
 from spade_llm.core.api import AgentContext
 from spade_llm.patterns.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
-    AgentSearchResponse, DirectoryFacilitatorAgentConf
+    AgentSearchResponse, DirectoryFacilitatorAgentConf, RegisterAgentBehaviour
 from tests.test_utils import TestPlatform, AgentEntry
 
 logging.basicConfig(level=logging.DEBUG)
@@ -133,13 +133,13 @@ class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
 
         await self.platform.start()
         
-        # Register agents with DF using dummy agent
-        async def register_agents(context: AgentContext):
-            await context.inform(self.df_agent.agent_type).with_content(math)
-            await context.inform(self.df_agent.agent_type).with_content(search)
-            await context.inform(self.df_agent.agent_type).with_content(travel)
+        class Register(ExecuteInContext):
+            async def execute(self, context: AgentContext):
+                await context.inform(DF_ADDRESS).with_content(math)
+                await context.inform(DF_ADDRESS).with_content(search)
+                await context.inform(DF_ADDRESS).with_content(travel)
         
-        self.dummy_agent.as_agent(register_agents)
+        self.dummy_agent.as_agent(Register())
         
         # Wait for 3 ACKNOWLEDGE messages
         for _ in range(3):
@@ -152,11 +152,12 @@ class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
         await self.platform.stop()
 
     def search_foragent(self, query: str) -> AgentSearchResponse:
-        async def send_search_request(context: AgentContext):
-            await context.request(self.df_agent.agent_type) \
-                .with_content(AgentSearchRequest(task=query))
+        class Send(ExecuteInContext):
+            async def execute(self, context: AgentContext):
+                await context.request(DF_ADDRESS) \
+                    .with_content(AgentSearchRequest(task=query))
         
-        self.dummy_agent.as_agent(send_search_request)
+        self.dummy_agent.as_agent(Send())
         response_message = self.dummy_agent.get_message()
         return AgentSearchResponse.model_validate_json(response_message.content)
 
