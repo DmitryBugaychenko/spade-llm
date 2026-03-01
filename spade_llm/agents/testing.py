@@ -1,6 +1,6 @@
 import queue
 import time
-from typing import List, Callable, Any, Optional
+from typing import List, Callable, Any, Optional, Awaitable
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour
 from spade_llm.builders import MessageBuilder
@@ -25,16 +25,14 @@ class AccumulateMessagesBehavior(MessageHandlingBehavior):
 class ExecuteContextLambdaBehavior(ContextBehaviour):
     """Behavior for executing a lambda expression over the agent's default context"""
     
-    def __init__(self, func: Callable[[AgentContext], Any], future: Any, context: AgentContext):
+    def __init__(self, func: Callable[[AgentContext], Awaitable[Any]], future: Any, context: AgentContext):
         super().__init__(context)  # No template, one-time use
         self.func = func
         self.future = future
     
     async def step(self):
         try:
-            result = self.func(self.context)
-            if hasattr(result, '__await__'):
-                result = await result
+            result = await self.func(self.context)
             self.future.set_result(result)
         except Exception as e:
             self.logger.error(f"Error executing context lambda: {e}", exc_info=True)
@@ -87,11 +85,11 @@ class DummyAgent(Agent):
             except queue.Empty:
                 break
     
-    def as_agent(self, func: Callable[[AgentContext], Any]):
-        """Execute a function over the agent's default context, marshaling execution to the event loop.
+    def as_agent(self, func: Callable[[AgentContext], Awaitable[Any]]):
+        """Execute an async coroutine over the agent's default context, marshaling execution to the event loop.
         
         Args:
-            func: A callable that takes the agent's default_context as parameter
+            func: An async callable that takes the agent's default_context as parameter
             
         Returns:
             A concurrent.futures.Future that will contain the result of the execution
