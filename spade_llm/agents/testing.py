@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Callable, Any
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
 from spade_llm.builders import MessageBuilder
@@ -36,6 +36,29 @@ class SendMessageBehavior(MessageHandlingBehavior):
             self.kill()
 
 
+class ExecuteContextLambdaBehavior(MessageHandlingBehavior):
+    """Behavior for executing a lambda expression over the agent's default context"""
+    
+    def __init__(self, func: Callable, future: Any):
+        super().__init__(None)  # No template, one-time use
+        self.func = func
+        self.future = future
+        self.executed = False
+    
+    async def step(self):
+        if not self.executed:
+            try:
+                result = self.func(self.context)
+                if hasattr(result, '__await__'):
+                    result = await result
+                self.future.set_result(result)
+            except Exception as e:
+                self.future.set_exception(e)
+            finally:
+                self.executed = True
+                self.kill()
+
+
 class DummyAgent(Agent):
     """This is a dummy agent for testing purposes. It allows to send messages to over agents
     and collect all incoming messages for assertions"""
@@ -60,3 +83,18 @@ class DummyAgent(Agent):
         This method adds a behavior to handle the message sending within the agent's event loop."""
         send_behavior = SendMessageBehavior(message_builder)
         self.add_behaviour(send_behavior)
+    
+    def execute_context_lambda(self, func: Callable):
+        """Execute a lambda expression over the agent's default context, marshaling execution to the event loop.
+        
+        Args:
+            func: A callable that takes the agent's default_context as parameter
+            
+        Returns:
+            A concurrent.futures.Future that will contain the result of the execution
+        """
+        import concurrent.futures
+        future = concurrent.futures.Future()
+        execute_behavior = ExecuteContextLambdaBehavior(func, future)
+        self.add_behaviour(execute_behavior)
+        return future
