@@ -139,6 +139,12 @@ class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
         
         future = self.dummy_agent.as_agent(register_agents)
         future.result(timeout=10)  # Wait for registration to complete
+        
+        # Wait for 3 ACKNOWLEDGE messages
+        for _ in range(3):
+            msg = self.dummy_agent.get_message(timeout=10)
+            self.assertIsNotNone(msg, "Expected ACKNOWLEDGE message not received")
+            self.assertEqual(msg.performative, "ACKNOWLEDGE")
 
     async def asyncTearDown(self):
         self.dummy_agent.stop()
@@ -146,13 +152,13 @@ class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
 
     def search_foragent(self, query: str) -> AgentSearchResponse:
         def send_search_request(context):
-            future = context.request(self.df_agent) \
+            return context.request(self.df_agent) \
                 .with_content(AgentSearchRequest(task=query)) \
                 .send_and_receive(Templates.INFORM())
-            return AgentSearchResponse.model_validate_json(future.result().content)
         
         future = self.dummy_agent.as_agent(send_search_request)
-        return future.result(timeout=10)
+        response_message = future.result(timeout=10)
+        return AgentSearchResponse.model_validate_json(response_message.content)
 
     def assertAgent(self, result: AgentSearchResponse, id: str):
         self.assertListEqual([id], [x.id for x in result.agents])
