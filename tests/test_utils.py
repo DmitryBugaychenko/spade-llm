@@ -16,6 +16,7 @@ class AgentEntry:
     agent: Agent
     tools: list[Any] = field(default_factory=list)
     contacts: list[DelegateToolConfig] = field(default_factory=list)
+    configuration: Any = None
 
 
 class TestPlatform:
@@ -77,6 +78,11 @@ class TestPlatform:
         for entry in self.agent_entries:
             agent = entry.agent
             agent_type = agent.agent_type
+            
+            # If the agent is configurable and has a configuration, apply it
+            if entry.configuration is not None and hasattr(agent, '_configure'):
+                agent._configure(entry.configuration)
+                
             await self.platform.register_agent(agent, entry.tools, entry.contacts)
             self.agents[agent_type] = agent
         await message_service.start_bridges()
