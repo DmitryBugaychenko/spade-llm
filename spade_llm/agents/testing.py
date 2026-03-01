@@ -26,20 +26,17 @@ class ExecuteContextLambdaBehavior(MessageHandlingBehavior):
         super().__init__(None)  # No template, one-time use
         self.func = func
         self.future = future
-        self.executed = False
     
     async def step(self):
-        if not self.executed:
-            try:
-                result = self.func(self.context)
-                if hasattr(result, '__await__'):
-                    result = await result
-                self.future.set_result(result)
-            except Exception as e:
-                self.future.set_exception(e)
-            finally:
-                self.executed = True
-                self.set_is_done()
+        try:
+            result = self.func(self.context)
+            if hasattr(result, '__await__'):
+                result = await result
+            self.future.set_result(result)
+        except Exception as e:
+            self.future.set_exception(e)
+        finally:
+            self.set_is_done()
 
 
 class DummyAgent(Agent):
