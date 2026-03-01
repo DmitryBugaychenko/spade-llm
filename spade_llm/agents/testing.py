@@ -19,23 +19,6 @@ class AccumulateMessagesBehavior(MessageHandlingBehavior):
             await self.context.reply_with_acknowledge(self.message).with_content("")
 
 
-class SendMessageBehavior(MessageHandlingBehavior):
-    """Behavior for sending a message and then removing itself"""
-    
-    def __init__(self, message_builder: MessageBuilder):
-        super().__init__(None)  # No template, one-time use
-        self.message_builder = message_builder
-        self.sent = False
-    
-    async def step(self):
-        if not self.sent:
-            # Send the message
-            await self.context.send_message(self.message_builder)
-            self.sent = True
-            # Remove this behavior after sending
-            self.kill()
-
-
 class ExecuteContextLambdaBehavior(MessageHandlingBehavior):
     """Behavior for executing a lambda expression over the agent's default context"""
     
@@ -56,7 +39,7 @@ class ExecuteContextLambdaBehavior(MessageHandlingBehavior):
                 self.future.set_exception(e)
             finally:
                 self.executed = True
-                self.kill()
+                self.set_is_done()
 
 
 class DummyAgent(Agent):
@@ -77,12 +60,6 @@ class DummyAgent(Agent):
     def clear_messages(self):
         """Clear accumulated messages"""
         self.accumulate_behavior.messages.clear()
-    
-    def send_message_from_outside(self, message_builder: MessageBuilder):
-        """Send a message to another agent from outside the agent event loop.
-        This method adds a behavior to handle the message sending within the agent's event loop."""
-        send_behavior = SendMessageBehavior(message_builder)
-        self.add_behaviour(send_behavior)
     
     def execute_context_lambda(self, func: Callable):
         """Execute a lambda expression over the agent's default context, marshaling execution to the event loop.
