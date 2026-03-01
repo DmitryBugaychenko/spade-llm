@@ -1,20 +1,24 @@
 import os
 import unittest
+from typing import List
 
 from langchain_gigachat import GigaChatEmbeddings
 
+from spade_llm.agents.testing import DummyAgent
 from spade_llm.builders import MessageBuilder
 from spade_llm.consts import Templates
 from spade_llm.patterns.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
     AgentSearchResponse
-from tests.base import SpadeTestCase
+from spade_llm.core.api import Message
+from tests.test_utils import TestPlatform, AgentEntry
 
-DF_ADDRESS = "df@localhost"
+
+DF_ADDRESS = "df"
 
 math = AgentDescription(
     description = "This is a mathematical expert can perform computations, even complex ones, "
                   "and solve mathematical problems",
-    id = "math@localhost",
+    id = "math",
     domain = "math",
     tier = 0,
     tasks = [
@@ -58,7 +62,7 @@ math = AgentDescription(
 
 search = AgentDescription(
     description = "This is an information retrieval expert capable of finding information in the Internet and answer factual questions",
-    id = "search@localhost",
+    id = "search",
     domain = "search",
     tier = 0,
     tasks = [
@@ -88,7 +92,7 @@ search = AgentDescription(
 
 travel = AgentDescription(
     description = "Assistant for the trip planning. Can help with tickets and hotels.",
-    id = "travel@localhost",
+    id = "travel",
     domain = "travel",
     tier = 0,
     tasks = [
@@ -109,37 +113,48 @@ travel = AgentDescription(
     ]
 )
 
-class MyTestCase(SpadeTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        SpadeTestCase.setUpClass()
-        df = DirectoryFacilitatorAgent(
-            DF_ADDRESS,
-            "pwd",
+class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.dummy_agent = DummyAgent("dummy")
+        self.df_agent = DirectoryFacilitatorAgent(
+              agent_type=DF_ADDRESS,
               embeddings=GigaChatEmbeddings(
                   credentials=os.environ['GIGA_CRED'],
                   verify_ssl_certs=False,
               ))
-        SpadeTestCase.startAgent(df)
+        
+        self.platform = TestPlatform(
+            agents=[
+                AgentEntry(agent=self.df_agent),
+                AgentEntry(agent=self.dummy_agent),
+            ],
+            wait_for={self.dummy_agent.agent_type}
+        )
+        
+        # Register agents with DF using dummy agent
+        def register_agents(context):
+            context.send_message(MessageBuilder.inform().to_agent(self.df_agent).with_content(math))
+            context.send_message(MessageBuilder.inform().to_agent(self.df_agent).with_content(search))
+            context.send_message(MessageBuilder.inform().to_agent(self.df_agent).with_content(travel))
+        
+        future = self.dummy_agent.as_agent(register_agents)
+        future.result(timeout=10)  # Wait for registration to complete
 
-        SpadeTestCase.sendAndReceive(
-            MessageBuilder.inform().to_agent(df).with_content(math),
-            Templates.ACKNOWLEDGE())
-        SpadeTestCase.sendAndReceive(
-            MessageBuilder.inform().to_agent(df).with_content(search),
-            Templates.ACKNOWLEDGE())
-        SpadeTestCase.sendAndReceive(
-            MessageBuilder.inform().to_agent(df).with_content(travel),
-            Templates.ACKNOWLEDGE())
+    async def asyncTearDown(self):
+        self.dummy_agent.stop()
+        await self.platform.run()
 
-    def search_foragent(self, query:str) -> AgentSearchResponse:
-        msg = SpadeTestCase.sendAndReceive(
-            MessageBuilder.request().to_agent(DF_ADDRESS)
-                .with_content(AgentSearchRequest(task = query)),
-            Templates.INFORM())
-        self.assertIsNotNone(msg,"Received no search result")
-        return AgentSearchResponse.model_validate_json(msg.body)
+    def search_foragent(self, query: str) -> AgentSearchResponse:
+        def send_search_request(context):
+            future = context.create_message_builder("request") \
+                .to_agent(self.df_agent) \
+                .with_content(AgentSearchRequest(task=query)) \
+                .send_and_receive(Templates.INFORM())
+            return AgentSearchResponse.model_validate_json(future.result().content)
+        
+        future = self.dummy_agent.as_agent(send_search_request)
+        return future.result(timeout=10)
 
     def assertAgent(self, result: AgentSearchResponse, id: str):
         self.assertListEqual([id], [x.id for x in result.agents])
@@ -150,14 +165,15 @@ class MyTestCase(SpadeTestCase):
         self.assertAgent(result, math.id)
 
     def test_find_search(self):
-        result =self.search_foragent(
+        result = self.search_foragent(
             "When and who discovered antarctic continent?")
         self.assertAgent(result, search.id)
 
     def test_find_travel(self):
-        result =self.search_foragent(
+        result = self.search_foragent(
             "I would like to visit Belgium in may")
         self.assertAgent(result, travel.id)
+
 
 if __name__ == '__main__':
     unittest.main()
