@@ -3,12 +3,12 @@ from spade_llm.core.api import AgentId, AgentContext
 from spade_llm.core.tools import SingleMessage
 from spade_llm.core.behaviors import MessageTemplate, ContextBehaviour
 from spade_llm.core.conf import configuration, Configurable, EmptyConfig
-from spade_llm.demo.platform.tg_example.bot import TelegramBot
+from spade_llm.demo.tg_example.bot import TelegramBot
 from spade_llm.core.models import CredentialsUtils
-from spade_llm import consts
+from spade_llm.core import consts
 from asyncio import sleep as asleep
 from pydantic import BaseModel, Field
-from typing import cast, TypeVar, Type, Union, Any
+from typing import TypeVar, Type, Any
 from abc import abstractmethod, ABCMeta
 
 T = TypeVar('T')

@@ -36,19 +36,19 @@ INFO:console:Started agent thread
 User input: синус 20
 INFO:httpx:HTTP Request: POST https://ngw.devices.sberbank.ru:9443/api/v2/oauth "HTTP/1.1 200 OK"
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
-INFO:spade_llm.demo.platform.trigonometry.trigtoolkit:Calculating sin with 5 digits precision
+INFO:spade_llm.demo.trigonometry.trigtoolkit:Calculating sin with 5 digits precision
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
 Assistant: Синус 20 градусов равен примерно 0.34202.
 User input: Немецкий синус 20
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
-INFO:spade_llm.demo.platform.trigonometry.trigtoolkit:Calculating sin with 14 digits precision
+INFO:spade_llm.demo.trigonometry.trigtoolkit:Calculating sin with 14 digits precision
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
 Assistant: Результат немецкого синуса от 20 градусов равен 0.34202014332567
 User input: Посчитай сумму немецкого синуса 20 и обычного синуса 15
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
-INFO:spade_llm.demo.platform.trigonometry.trigtoolkit:Calculating sin with 14 digits precision
+INFO:spade_llm.demo.trigonometry.trigtoolkit:Calculating sin with 14 digits precision
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
-INFO:spade_llm.demo.platform.trigonometry.trigtoolkit:Calculating sin with 5 digits precision
+INFO:spade_llm.demo.trigonometry.trigtoolkit:Calculating sin with 5 digits precision
 INFO:httpx:HTTP Request: POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions "HTTP/1.1 200 OK"
 Assistant: Сумма равна $0.34202014332567 + 0.25882 = 0.60084014332567$.
 exitUser input: 

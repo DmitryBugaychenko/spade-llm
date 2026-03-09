@@ -31,7 +31,7 @@ tools:
 agents:
   # Simple react agent connected to LLM
   react:
-    type_name: spade_llm.core.react.ReactAgent
+    type_name: spade_llm.agents.react.ReactAgent
     args:
       # System prompt for the agent
       system_prompt: |

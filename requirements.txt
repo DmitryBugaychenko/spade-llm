@@ -1,6 +1,5 @@
 aioconsole==0.8.1
 langchain_gigachat==0.3.4
-spade==4.0.3
 wikipedia==1.4.0
 pydantic==2.10.6
 chromadb==0.6.3
@@ -30,3 +29,6 @@ playwright~=1.55.0
 langgraph~=0.6.7
 langchain_openai~=0.3.33
 openai~=1.69.0
+langchain-openai~=0.3.33
+posthog~=3.17.0
+typing_extensions~=4.12.2

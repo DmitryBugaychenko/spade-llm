@@ -4,9 +4,9 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, cast, Any, Type, List
 
 from pydantic import Field, BaseModel
-from langchain_core.tools import BaseTool, StructuredTool, BaseToolkit
+from langchain_core.tools import BaseTool, StructuredTool
 
-from spade_llm import consts
+from spade_llm.core import consts
 from spade_llm.core.api import AgentContext, LocalToolFactory
 from spade_llm.core.behaviors import BehaviorsOwner, ReceiverBehavior, MessageTemplate
 from spade_llm.core.conf import ConfigurableRecord, Configurable, configuration
@@ -100,7 +100,7 @@ class DelegateToolConfig(BaseModel, LocalToolFactory):
     """
     agent_type: str = Field(description="Type of the agent to delegate to")
     description: str = Field(description="Description of the service provided by the agent")
-    performative: str = Field(default=consts.REQUEST,description="Performative to use when delegating")
+    performative: str = Field(default=consts.REQUEST, description="Performative to use when delegating")
     timeout: float = Field(default=60,description="Timeout for the agent response")
     args_schema: Optional[ArgsSchema] = Field(
         default=None,

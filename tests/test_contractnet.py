@@ -1,15 +1,13 @@
-import asyncio
 import logging
-import os
 import unittest
-import uuid
 from typing import Optional, Set
 
-from langchain_gigachat import GigaChatEmbeddings
 from pydantic import BaseModel
 
 from spade_llm.agents.dummy import DummyAgent, ExecuteInContext
+from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageTemplate, ContextBehaviour
+from spade_llm.core.testing import TestPlatform, AgentEntry
 from spade_llm.patterns.contractnet import (
     ContractNetRequest,
     ContractNetProposal,
@@ -21,12 +19,9 @@ from spade_llm.patterns.discovery import (
     AgentDescription,
     AgentTask,
     DirectoryFacilitatorAgent,
-    AgentSearchRequest,
-    AgentSearchResponse,
     DirectoryFacilitatorAgentConf,
 )
-from spade_llm.core.testing import TestPlatform, AgentEntry
-from spade_llm.core.agent import Agent
+from tests.base import ModelTestCase
 
 logging.basicConfig(level=logging.INFO)
 DF_ADDRESS = "df"
@@ -98,7 +93,7 @@ transactions_agent_desc = AgentDescription(
 )
 
 
-class ContractNetTest(unittest.TestCase):
+class ContractNetTest(ModelTestCase):
 
     def test_contract_net_protocol(self):
         # Create dummy agent for testing
@@ -180,9 +175,7 @@ class ContractNetTest(unittest.TestCase):
                 AgentEntry(agent=dummy_agent),
             ],
             wait_for={dummy_agent.agent_type},
-            embedding_models={
-                "test": GigaChatEmbeddings(credentials=os.environ['GIGA_CRED'], verify_ssl_certs=False)
-            }
+            embedding_models={"test": self.embeddings}
         )
 
     def test_contract_net_responder_behavior(self):

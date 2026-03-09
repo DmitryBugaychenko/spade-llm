@@ -5,6 +5,7 @@ import os
 def main():
 
     giga = GigaChat(
+        auth_url="url для внутренней аутентификации",
         credentials=os.environ['GIGA_CRED'],
         verify_ssl_certs=False
     )

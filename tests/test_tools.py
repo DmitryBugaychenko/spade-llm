@@ -17,7 +17,7 @@ class TestConfig(unittest.TestCase):
         return json.dumps(data)
 
     conf_yaml = '''
-            type_name: spade_llm.platform.tools.LangChainApiWrapperToolFactory
+            type_name: spade_llm.core.tools.LangChainApiWrapperToolFactory
             args:
               type_name: langchain_community.tools.WikipediaQueryRun
               api_wrapper:
@@ -62,7 +62,7 @@ class TestConfig(unittest.TestCase):
         config_yaml = '''
         tools:
           wikipedia:
-            type_name: spade_llm.platform.tools.LangChainApiWrapperToolFactory
+            type_name: spade_llm.core.tools.LangChainApiWrapperToolFactory
             args:
               type_name: langchain_community.tools.WikipediaQueryRun
               api_wrapper:

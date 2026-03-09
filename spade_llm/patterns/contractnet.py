@@ -3,12 +3,12 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Optional
-from spade_llm import consts
+from spade_llm.core import consts
 from pydantic import BaseModel, Field
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate, ContextBehaviour, \
     MessageCollectorBehavior
 from spade_llm.core.api import AgentContext
-from spade_llm.demo.platform.contractnet.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest, \
+from spade_llm.patterns.discovery import AgentDescription, AgentSearchResponse, AgentSearchRequest, \
     DF_ADDRESS
 from spade_llm.core.api import Message
 
@@ -142,7 +142,7 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
     async def get_proposals(self, agents: list[AgentDescription]) -> list[ContractNetProposal]:
         # Add collector behavior before sending requests to avoid race conditions
         collector = MessageCollectorBehavior(
-            MessageTemplate(performative=consts.PROPOSE, thread_id=self.context.thread_id),
+            MessageTemplate(thread_id=self.context.thread_id),
             expected_count=len(agents),
         )
         self.agent.add_behaviour(collector)
@@ -164,7 +164,8 @@ class ContractNetInitiatorBehavior(ContextBehaviour):
 
         result: list[ContractNetProposal] = []
         for msg in collector.messages:
-            result.append(ContractNetProposal.model_validate_json(msg.content))
+            if MessageTemplate.propose().match(msg):
+                result.append(ContractNetProposal.model_validate_json(msg.content))
 
         return result
 

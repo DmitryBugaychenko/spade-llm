@@ -1,397 +1,135 @@
-import logging
-import uuid
-from asyncio import sleep as asleep
+from pydantic import BaseModel, Field
 
-from aioconsole import ainput
-from gigachat.api.threads.post_threads_run import asyncio
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
-from langchain_core.tools import BaseTool
-from langchain_core.tools.structured import StructuredTool
-from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour
-from spade.message import Message
-from spade.template import Template
-
-from spade_llm.behaviours import SendAndReceiveBehaviour, RequestHandlingBehaviour
+from spade_llm.core import consts
+from spade_llm.core.agent import Agent
+from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
+from spade_llm.core.conf import configuration, Configurable
 
 
-logger = logging.getLogger(__name__)
+class FinancialAgentConf(BaseModel):
+    balance: int = Field(description="Initial balance of the agent.")
 
-class ChatAgent(Agent):
-    """
-    This agent acts as a general assistant. Gets user prompts from stdin
-    and uses standard cycle for handling.
+class FinancialMessage(BaseModel):
+    amount: int = Field(description="Amount of the payment. This field is required and cannot be 0")
 
-    Also provides ability to confirm certain operations with the user.
-    """
-    model: BaseChatModel = None
-    tools: dict[str,BaseTool] = None
+@configuration(FinancialAgentConf)
+class PaymentsAgent(Agent, Configurable[FinancialAgentConf]):
 
-    def __init__(self, model: BaseChatModel, tools: dict[str,BaseTool], jid: str, password: str):
-        super().__init__(jid, password)
-        self.model = model
-        self.tools = tools
+    class PaymentBehaviour(MessageHandlingBehavior):
 
-    @staticmethod
-    def cformat(msg:str) -> str:
-        """Utility for getting more visible messages in console"""
-        return "\033[1m\033[92m{}\033[00m\033[00m".format(msg)
+        def __init__(self, config: FinancialAgentConf):
+            super().__init__(MessageTemplate.request())
+            self.config = config
 
-    class RequestCycle(RequestHandlingBehaviour):
-        """
-        Cycle for handling user prompts from stdin.
-        """
-        async def handle_answer(self, answer: BaseMessage):
-            # Small hack to let all the logs to be printed before printing
-            await asleep(0.5)
-            print(ChatAgent.cformat("GigaChat: " + answer.content))
-
-        async def get_prompt(self) -> BaseMessage:
-            # Small hack to let all the logs to be printed before prompting
-            await asleep(0.5)
-            user_input: str = await ainput(ChatAgent.cformat("User: "))
-            if user_input.lower() in {"пока", "bye"}:
-                await self.agent.stop()
-                return None
+        async def step(self):
+            balance = await self.context.get_item("balance")
+            if not balance or balance == "":
+                self.logger.info("No balance set, using default: %s", self.config.balance)
+                balance = self.config.balance
             else:
-                return HumanMessage(user_input)
+                self.logger.debug("Received balance: %s", balance)
+                balance = int(balance)
 
-    class AcknowledgmentsCycle(CyclicBehaviour):
-        """
-        Cycle for getting user acknowledgements.
-        """
-        async def run(self):
-            msg = await self.receive(60)
-            if msg:
-                # Small hack to let all the logs to be printed before prompting
-                await asleep(0.5)
-                user_input = await ainput(ChatAgent.cformat('Confirm operation "{0}" [y/n]: '.format(msg.body)))
-                await self.send(Message(
-                    to = str(msg.sender),
-                    thread = msg.thread,
-                    metadata = {"performative" : ("acknowledge" if user_input == "y" else "refuse")}
-                ))
+            if self.message:
+                payment_request = FinancialMessage.model_validate_json(self.message.content)
+                self.logger.debug("Received payment request: %s", payment_request)
 
-    async def setup(self):
-        print("Agent starting . . .")
-        self.model = self.model.bind_tools(self.tools.values())
-        self.add_behaviour(self.RequestCycle(
-            model = self.model,
-            context= [SystemMessage(
-                content="You are a personal assistant helping with different matters. Use provided tools to solve user tasks."
-            )],
-            tools=self.tools
-        ))
+                if payment_request.amount > balance:
+                    self.logger.warning("Not enough balance to pay: %s", payment_request.amount)
+                    deficiency = payment_request.amount - balance
+                    await (self.context
+                           .reply_with_failure(self.message)
+                           .with_content(f"Balance is insufficient for payment, replenish payment account for {deficiency} rubles."))
+                else:
+                    new_balance = balance - payment_request.amount
+                    await self.context.put_item("balance", str(new_balance))
+                    self.logger.info("Payment done, new balance: %s", new_balance)
+                    await (self.context
+                           .reply_with_inform(self.message)
+                           .with_content(f"Payment for {payment_request.amount} successfully completed, new balance is {new_balance} rubles."))
 
-        self.add_behaviour(
-            self.AcknowledgmentsCycle(),
-            Template(metadata={"performative": "request_with_acknowledge"}))
+    class ReplenishBehaviour(MessageHandlingBehavior):
+        def __init__(self, config: FinancialAgentConf):
+            super().__init__(MessageTemplate(
+                performative=consts.INFORM,
+                validator=MessageTemplate.from_agent("savings")))
+            self.config = config
 
-class FinancialAgent(Agent):
-    """
-    Agent acting like financial assistant. Does not interact with user directly,
-    receives messages from chat agent.
-    """
-    model: BaseChatModel = None
-    tools: dict[str,BaseTool] = None
-
-    def __init__(self, model: BaseChatModel, tools: dict[str,BaseTool], jid: str, password: str):
-        super().__init__(jid, password)
-        self.model = model
-        self.tools = tools
-
-
-    class RequestCycle(RequestHandlingBehaviour):
-        msg: Message = None
-
-        async def handle_answer(self, answer: BaseMessage):
-            logger.info("Provided financial solution %s", answer)
-            await self.send(Message(
-                to=str(self.msg.sender),
-                thread=self.msg.thread,
-                body=answer.content,
-                metadata={"performative": "inform"}
-            ))
-
-        async def get_prompt(self) -> BaseMessage:
-            self.msg = await self.receive(600)
-            if self.msg:
-                logger.info("Got financial request %s", self.msg)
-                return HumanMessage(self.msg.body)
+        async def step(self):
+            balance = await self.context.get_item("balance")
+            if not balance or balance == "":
+                self.logger.info("No balance set, using default: %s", self.config.balance)
+                balance = self.config.balance
             else:
-                return None
+                self.logger.debug("Received balance: %s", balance)
+                balance = int(balance)
 
-    async def setup(self):
-        self.model = self.model.bind_tools(self.tools.values())
-        self.add_behaviour(self.RequestCycle(
-            model = self.model,
-            context= [SystemMessage(
-                content="You are financial assistant managing users funds. Use tools to perform payments and access user savings."
-            )],
-            tools=self.tools
-        ))
-        print("Financial assistant started.")
+            if self.message:
+                replenish_request = FinancialMessage.model_validate_json(self.message.content)
+                self.logger.debug("Received replenish request: %s", replenish_request)
+                new_balance = balance + replenish_request.amount
+                await self.context.put_item("balance", str(new_balance))
+                self.logger.info("Replenish done, new balance: %s", new_balance)
 
-    def create_tool(self, sender: Agent) -> BaseTool:
-        """
-        Create a tool for calling financial agent.
-        :param sender: Who will call the agent
-        :return: Tool to use
-        """
-        async def finance_help(request: str) -> str:
-            """
-            This is a financial tool capable of handling payments and working with users savings.
+    def setup(self):
+        self.add_behaviour(self.PaymentBehaviour(self.config))
+        self.add_behaviour(self.ReplenishBehaviour(self.config))
 
-            Args:
-                request: User request to perform.
-            """
-            thread_id = uuid.uuid4().__str__()
-            msg = Message(
-                to = str(self.jid),
-                body = request,
-                thread=thread_id,
-                metadata= {"performative": "request"}
-            )
-            response_template = Template(
-                thread=thread_id,
-                metadata= {"performative": "inform"}
-            )
-            snd = SendAndReceiveBehaviour(msg,response_template)
-            sender.add_behaviour(snd, response_template)
-            await snd.join()
-            return snd.response.body
+@configuration(FinancialAgentConf)
+class SavingsAgent(Agent, Configurable[FinancialAgentConf]):
+    class ReplenishBehaviour(MessageHandlingBehavior):
 
-        return StructuredTool.from_function(
-            name="finance_help",
-            coroutine=finance_help,
-            infer_schema=True,
-            parse_docstring=True
-        )
+        def __init__(self, config: FinancialAgentConf):
+            super().__init__(MessageTemplate.request())
+            self.config = config
 
-class PaymentAgent(Agent):
-    """
-    Simple LLM-free agent mocking payments and controlling user balance. Can perform both
-    payments and replenish
-    """
-    balance: int
+        async def step(self):
+            balance = await self.context.get_item("balance")
+            if not balance or balance == "":
+                self.logger.info("No balance set, using default: %s", self.config.balance)
+                balance = self.config.balance
+            else:
+                self.logger.debug("Received balance: %s", balance)
+                balance = int(balance)
 
-    def __init__(self, balance: int, jid: str, password: str):
-        super().__init__(jid, password)
-        self.balance = balance
+            if self.message:
+                replenish_request = FinancialMessage.model_validate_json(self.message.content)
+                self.logger.debug("Received replenish request: %s", replenish_request)
 
-    class ReceiveReplenishRequests(CyclicBehaviour):
-        async def run(self):
-            msg = await self.receive(60)
-            if msg:
-                logger.info("Replenish request received %s", msg)
-                amount = int(msg.body)
-                self.agent.balance += amount
-                logger.info("Balance after replenish is %i", self.agent.balance)
-
-                response = Message(
-                    to= str(msg.sender.jid),
-                    thread=msg.thread,
-                    body="Replenish accepted.",
-                    metadata={"performative": "acknowledge"}
-                )
-                await self.send(response)
-
-
-    class ReceivePaymentRequests(CyclicBehaviour):
-        async def run(self):
-            msg = await self.receive(60)
-            if msg:
-                logger.info("Payment request received %s", msg)
-                amount = int(msg.body)
-
-                if amount <= self.agent.balance:
-                    self.agent.balance = self.agent.balance - int(msg.body)
-                    logger.info("Balance after payment is %i", self.agent.balance)
-
-                    response = Message(
-                        to= str(msg.sender.jid),
-                        thread=msg.thread,
-                        body="Payment successfully completed.",
-                        metadata={"performative": "inform"}
-                    )
-                    await self.send(response)
+                if replenish_request.amount > balance:
+                    self.logger.warning("Not enough balance to replenish: %s", replenish_request.amount)
+                    deficiency = replenish_request.amount - balance
+                    await (self.context
+                           .reply_with_failure(self.message)
+                           .with_content(f"Balance is insufficient at savings account, deficiency is {deficiency} rubles."))
                 else:
-                    logger.info("Balance is insufficient for payment  %i", self.agent.balance)
-                    response = Message(
-                        to= str(msg.sender.jid),
-                        thread=msg.thread,
-                        body="Balance is insufficient for payment, replenish payment account for {0} rubles.".format(amount - self.agent.balance),
-                        metadata={"performative": "inform"}
-                    )
-                await self.send(response)
+                    await (self.context
+                           .request_approval("user")
+                           .with_content(f"Replenish current account from savings for {replenish_request.amount}"))
 
-    async def setup(self):
-        logger.info("Payment agent is starting with balance %i",  self.balance)
-        template = Template()
-        template.metadata = {"performative": "request"}
-        self.add_behaviour(self.ReceivePaymentRequests(), template)
+                    self.logger.info("Waiting for user approval...")
+                    msg = await self.receive(
+                        template = MessageTemplate(
+                            thread_id=self.context.thread_id, validator=MessageTemplate.from_agent("user")),
+                        timeout=60)
+                    self.logger.info("Received message: %s", msg)
 
-        template = Template()
-        template.metadata = {"performative": "request_with_acknowledge"}
-        self.add_behaviour(self.ReceiveReplenishRequests(), template)
+                    if not msg or msg.performative != consts.ACKNOWLEDGE:
+                        self.logger.warning("User did not approve replenishment.")
+                        await (self.context
+                               .reply_with_failure(self.message)
+                               .with_content(f"User did not approve replenishment."))
+                    else:
+                        new_balance = balance - replenish_request.amount
+                        await self.context.put_item("balance", str(new_balance))
+                        await (self.context
+                               .inform("payments")
+                               .with_content(FinancialMessage(amount=replenish_request.amount)))
 
-    def create_tool(self, sender: Agent) -> BaseTool:
-        async def request_payment(amount: int) -> str:
-            """
-            The tool for performing payments from the users payment account
+                        self.logger.info("Replenish done, new balance at savings account: %s", new_balance)
+                        await (self.context
+                               .reply_with_inform(self.message)
+                               .with_content(f"Replenish of current account for {replenish_request.amount} successfully completed."))
 
-            Args:
-                amount: Amount of rubbles to pay
-            """
-            thread_id = uuid.uuid4().__str__()
-            msg = Message(
-                to = str(self.jid),
-                body = str(amount),
-                thread=thread_id,
-                metadata= {"performative": "request"}
-            )
-            response_template = Template(
-                thread=thread_id,
-                metadata= {"performative": "inform"}
-            )
-            snd = SendAndReceiveBehaviour(msg,response_template)
-            sender.add_behaviour(snd, response_template)
-            await snd.join()
-            return snd.response.body
-
-        return StructuredTool.from_function(
-            name="payment_service",
-            coroutine=request_payment,
-            infer_schema=True,
-            parse_docstring=True
-        )
-
-class SavingsAgent(Agent):
-    """
-    LLM-free agent serving user savings. Can pass some of saved money to payment agent
-    if user approves.
-    """
-    balance: int
-    payment_adders: str
-    chat_jid: str
-
-    def __init__(self, balance: int, jid: str, password: str, payment_adders: str, chat_jid: str):
-        super().__init__(jid, password)
-        self.chat_jid = chat_jid
-        self.payment_adders = payment_adders
-        self.balance = balance
-
-    class RequestCycle(CyclicBehaviour):
-        async def run(self):
-            msg = await self.receive(60)
-            if msg:
-                logger.info("Request for savings withdraw received received %s", msg)
-                amount = int(msg.body)
-                if amount <= self.agent.balance:
-
-                    ack = await self.request_acknowledge(msg, amount)
-
-                    if ack.response.metadata["performative"] != "acknowledge":
-                        logger.error("User refused to withdraw savings.")
-                        return await self.send(Message(
-                            to= str(msg.sender.jid),
-                            thread=msg.thread,
-                            body="User refused to withdraw savings.",
-                            metadata={"performative": "inform"}
-                        ))
-
-                    await self.inform_payment_agent(amount)
-
-                    self.agent.balance = self.agent.balance - int(msg.body)
-                    logger.info("Savings after withdraw is %i", self.agent.balance)
-
-                    response = Message(
-                        to= str(msg.sender.jid),
-                        thread=msg.thread,
-                        body="Payment account replenished for {0} rubles.".format(amount),
-                        metadata={"performative": "inform"}
-                    )
-                    await self.send(response)
-                else:
-                    logger.info("Savings are insufficient for withdrawal  %i", self.agent.balance)
-                    response = Message(
-                        to= str(msg.sender.jid),
-                        thread=msg.thread,
-                        body="Not enough savings to replenish payment account.".format(amount - self.agent.balance),
-                        metadata={"performative": "inform"}
-                    )
-                await self.send(response)
-
-        async def inform_payment_agent(self, amount):
-            logger.info("Informing payment agent about replenish.")
-            thread_id = str(uuid.uuid4())
-            sndr = SendAndReceiveBehaviour(
-                message=Message(
-                    to=self.agent.payment_adders,
-                    thread=thread_id,
-                    body=str(amount),
-                    metadata={"performative": "request_with_acknowledge"}
-                ),
-                response_template=Template(
-                    thread=thread_id,
-                    metadata={"performative": "acknowledge"}
-                )
-            )
-            self.agent.add_behaviour(sndr, sndr.response_template)
-            await sndr.join()
-
-        async def request_acknowledge(self, msg, amount):
-            logger.info("Requesting acknowledgement from user.")
-            ack = SendAndReceiveBehaviour(
-                message=Message(
-                    to=self.agent.chat_jid,
-                    thread=msg.thread,
-                    body="Transfer {0} rubles from savings to payment account".format(amount),
-                    metadata={"performative": "request_with_acknowledge"}
-                ),
-                response_template=Template(
-                    sender=self.agent.chat_jid,
-                    thread=msg.thread
-                )
-            )
-            self.agent.add_behaviour(ack, ack.response_template)
-            await ack.join()
-            return ack
-
-    async def setup(self):
-        logger.info("Savings agent is starting with balance %i",  self.balance)
-        template = Template()
-        template.metadata = {"performative": "request"}
-        self.add_behaviour(self.RequestCycle(), template)
-
-    def create_tool(self, sender: Agent) -> BaseTool:
-        async def withdraw_savings(amount: int) -> str:
-            """
-            The tool is can replenish user payment account from the savings. Use it when where are not enough money for payments.
-
-            Args:
-                amount: Amount to replenish payment account for
-            """
-            thread_id = uuid.uuid4().__str__()
-            msg = Message(
-                to = str(self.jid),
-                body = str(amount),
-                thread=thread_id,
-                metadata= {"performative": "request"}
-            )
-            response_template = Template(
-                thread=thread_id,
-                metadata= {"performative": "inform"}
-            )
-            snd = SendAndReceiveBehaviour(msg,response_template)
-            sender.add_behaviour(snd, response_template)
-            await snd.join()
-            return snd.response.body
-
-        return StructuredTool.from_function(
-            name="savings_service",
-            coroutine=withdraw_savings,
-            infer_schema=True,
-            parse_docstring=True
-        )
+    def setup(self):
+        self.add_behaviour(self.ReplenishBehaviour(self.config))

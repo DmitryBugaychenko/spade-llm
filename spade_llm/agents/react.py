@@ -5,7 +5,7 @@ from pydantic import Field, BaseModel
 from spade_llm.core.agent import Agent
 from spade_llm.core.behaviors import MessageHandlingBehavior, MessageTemplate
 from spade_llm.core.conf import Configurable, configuration
-from spade_llm.demo.hierarchy.agents import logger
+
 
 
 class ReactAgentConfig(BaseModel):
@@ -52,18 +52,18 @@ class ReactBehaviour(MessageHandlingBehavior):
             if isinstance(answer, AIMessage) and answer.tool_calls:
                 for tool_call in answer.tool_calls:
                     tool_name = tool_call["name"]
-                    logger.debug("Invoking tool %s", tool_name)
+                    self.logger.debug("Invoking tool %s", tool_name)
                     if tool_name in tools_dict:
                         selected_tool = tools_dict[tool_name]
                         tool_answer = await selected_tool.ainvoke(tool_call["args"])
-                        logger.debug("Tool %s answered %s", tool_name, tool_answer)
+                        self.logger.debug("Tool %s answered %s", tool_name, tool_answer)
                         answers.append(ToolMessage(tool_answer, tool_call_id=tool_call["id"]))
                     else:
-                        logger.warning("Tool %s not found", tool_name)
+                        self.logger.warning("Tool %s not found", tool_name)
                         await self.context.reply_with_failure(self.message).with_content(f"Tool requested by model not found {tool_name}")
                         return
             else:
-                logger.debug("Got final answer %s", answer)
+                self.logger.debug("Got final answer %s", answer)
                 await self.context.reply_with_inform(self.message).with_content(answer.content)
                 return
 

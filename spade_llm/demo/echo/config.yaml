@@ -8,7 +8,7 @@ storage:
 agents:
   # Echo agent which replies back to the sender of the message with the same content
   echo:
-    type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+    type_name: spade_llm.agents.echo.EchoAgentHandler
   # Console agent which listens for commands from console and sends them to the delegate agent
   console:
     type_name: spade_llm.agents.console.ConsoleAgent

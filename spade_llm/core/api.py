@@ -6,7 +6,7 @@ from langchain_core.tools import BaseTool
 from multipledispatch import dispatch
 from pydantic import BaseModel, Field
 
-from spade_llm import consts
+from spade_llm.core import consts
 from spade_llm.core.models import ModelsProvider
 
 

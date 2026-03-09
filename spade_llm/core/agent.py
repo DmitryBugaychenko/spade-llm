@@ -10,7 +10,8 @@ import logging
 import aiologic
 
 from spade_llm.core.api import Message, AgentHandler, AgentContext
-from spade_llm.core.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner
+from spade_llm.core.behaviors import Behaviour, MessageHandlingBehavior, BehaviorsOwner, ContextBehaviour
+
 
 class MessageDispatcher(metaclass=ABCMeta):
     @abstractmethod
@@ -145,6 +146,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
     Base class for all agents. Provides asyncio event loop for execution, adds and removes
     behaviors, handles messages by dispatching them to interested behaviors.
     """
+    _is_initialized: bool
     _loop: AbstractEventLoop
     _dispatcher: ThreadDispatcher
     _behaviors: list[Behaviour]  # Internal list for storing non-MHB Behaviors
@@ -161,6 +163,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         self._behaviors = []
         self._is_stopped = asyncio.Event()
         self._is_completed = aiologic.Event() # This is a thread-safe event
+        self._is_initialized = False
 
     @property
     def agent_type(self) -> str:
@@ -195,7 +198,6 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         and calls run_until_complete for the loop.
         """
         self._default_context = default_context  # Store the default context here
-        self.setup()
 
         self._thread = threading.Thread(
             target=self._run_agent_in_thread,
@@ -207,8 +209,12 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         """
         Runs the event loop in a separate thread.
         """
-        self._loop = asyncio.new_eventLoop()
+        self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
+
+        self.setup()
+
+        self._is_initialized = True
 
         for beh in self._behaviors:
             beh.start()
@@ -235,7 +241,7 @@ class Agent(AgentHandler, BehaviorsOwner, metaclass=ABCMeta):
         if isinstance(beh, MessageHandlingBehavior):
             self._dispatcher.add_behaviour(beh)
         beh.setup(self)
-        if self.is_running():
+        if self._is_initialized:
             beh.start()
         self.logger.debug("Added behavior %s to agent %s", beh, self)
 

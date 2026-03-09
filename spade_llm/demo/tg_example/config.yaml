@@ -8,13 +8,13 @@ storage:
 agents:
   # Агент отвечающий за ответ на запрос пользователя (В данном случае просто возвращается его же сообщение)
   echo:
-    type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+    type_name: spade_llm.agents.echo.EchoAgentHandler
   # Бот отвечает за получение и отправку сообщений пользователю, и за инициализацию тг-бота
   bot:
-    type_name: spade_llm.demo.platform.tg_example.agents.Bot
+    type_name: spade_llm.demo.tg_example.agents.Bot
     args:
       tg_bot:
-        type_name:  spade_llm.demo.platform.tg_example.bot.TelegramBot
+        type_name:  spade_llm.demo.tg_example.bot.TelegramBot
         args:
             TOKEN: env.BOT_TOKEN
       delegate_type: echo

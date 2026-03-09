@@ -34,7 +34,7 @@ storage:
   type_name: spade_llm.core.storage.InMemoryStorageFactory
 agents:
   echo:
-    type_name: spade_llm.demo.platform.echo.agents.EchoAgentHandler
+    type_name: spade_llm.agents.echo.EchoAgentHandler
   console:
     type_name: spade_llm.agents.console.ConsoleAgent
     args:

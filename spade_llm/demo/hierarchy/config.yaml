@@ -30,15 +30,15 @@ tools:
           lang: en
 agents:
   payments:
-    type_name: spade_llm.demo.platform.hierarchy.agents.PaymentsAgent
+    type_name: spade_llm.demo.hierarchy.agents.PaymentsAgent
     args:
       balance: 10000
   savings:
-    type_name: spade_llm.demo.platform.hierarchy.agents.SavingsAgent
+    type_name: spade_llm.demo.hierarchy.agents.SavingsAgent
     args:
       balance: 100000
   financial_assistant:
-    type_name: spade_llm.core.react.ReactAgent
+    type_name: spade_llm.agents.react.ReactAgent
     args:
       system_prompt: |
         You are a financial assistant helping users with their finances. Use
@@ -50,18 +50,18 @@ agents:
         description: |
           This is a payments agent capable of handling payments from current account.
         args_schema:
-          type_name: spade_llm.demo.platform.hierarchy.agents.FinancialMessage
+          type_name: spade_llm.demo.hierarchy.agents.FinancialMessage
       - agent_type: savings
         description: |
           This is agent manage savings, it can replenish current account if needed.
         args_schema:
-          type_name: spade_llm.demo.platform.hierarchy.agents.FinancialMessage
+          type_name: spade_llm.demo.hierarchy.agents.FinancialMessage
       - agent_type: user
         description: |
           Use this contact to get information from the client himself. If your are not sure about amount, 
           better ask client for clarification.
   assistant:
-    type_name: spade_llm.core.react.ReactAgent
+    type_name: spade_llm.agents.react.ReactAgent
     args:
       system_prompt: |
         You are a personal assistant helping with different matters.

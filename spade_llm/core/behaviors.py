@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 import asyncio
 from typing import Optional, Callable
 
-from spade_llm import consts
+from spade_llm.core import consts
 from spade_llm.core.api import MessageHandler, AgentContext, Message
 
 
@@ -33,6 +33,13 @@ class BehaviorsOwner(metaclass=ABCMeta):
         """
         Add behavior to the list and configures to use this container
         :param beh: Behavior to add
+        """
+        pass
+
+    @abstractmethod
+    def stop(self):
+        """
+        Stops the agent by stopping the event loop and signaling completion.
         """
         pass
 

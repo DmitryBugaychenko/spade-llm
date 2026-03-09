@@ -76,6 +76,7 @@ class AgentSearchResponse(BaseModel):
 
 
 class DirectoryFacilitatorAgentConf(BaseModel):
+    model: str = Field(default="GigaChat", description="Model to use for calculating embeddings")
     threshold: float = Field(default=400, description="Threshold for searching agents.")
     score_ascending: bool = Field(default=True, description="Should the search be ascending or descending.")
 
@@ -139,11 +140,9 @@ class SearchForAgentBehaviour(MessageHandlingBehavior):
 
 @configuration(DirectoryFacilitatorAgentConf)
 class DirectoryFacilitatorAgent(Agent, Configurable[DirectoryFacilitatorAgentConf]):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.embeddings = models.EMBEDDINGS
-        self.index = Chroma(embedding_function=self.embeddings, collection_name="AGENTS")
 
     def setup(self):
-        self.add_behaviour(RegisterAgentBehaviour(self.config, index=self.index, embeddings=self.embeddings))
-        self.add_behaviour(SearchForAgentBehaviour(self.config, index=self.index, embeddings=self.embeddings))
+        embeddings = self.default_context.create_embeddings_model(self.config.model)
+        index = Chroma(embedding_function=embeddings, collection_name="AGENTS")
+        self.add_behaviour(RegisterAgentBehaviour(self.config, index=index, embeddings=embeddings))
+        self.add_behaviour(SearchForAgentBehaviour(self.config, index=index, embeddings=embeddings))

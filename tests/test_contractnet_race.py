@@ -5,11 +5,10 @@ import unittest
 from typing import Optional
 
 from pydantic import BaseModel
-from spade.message import Message
 
-from spade_llm.core.api import AgentContext
+from spade_llm.core.api import AgentContext, Message
 from spade_llm.core.behaviors import MessageTemplate
-from spade_llm.demo.platform.contractnet.contractnet import (
+from spade_llm.patterns.contractnet import (
     ContractNetRequest,
     ContractNetProposal,
     ContractNetResponder,
@@ -17,8 +16,8 @@ from spade_llm.demo.platform.contractnet.contractnet import (
     ContractNetInitiatorBehavior,
 )
 from spade_llm.core.agent import Agent
-from spade_llm.demo.platform.contractnet.discovery import AgentDescription
-from tests.test_utils import TestPlatform, AgentEntry
+from spade_llm.patterns.discovery import AgentDescription
+from spade_llm.core.testing import TestPlatform, AgentEntry
 
 logging.basicConfig(level=logging.DEBUG)
 

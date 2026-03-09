@@ -3,7 +3,7 @@ from asyncio import sleep as asleep
 from aioconsole import ainput
 from pydantic import BaseModel, Field
 
-from spade_llm import consts
+from spade_llm.core import consts
 from spade_llm.core.agent import Agent
 from spade_llm.core.api import AgentId, AgentContext
 from spade_llm.core.behaviors import ContextBehaviour, MessageTemplate
@@ -66,7 +66,7 @@ class InputBehavior(ContextBehaviour):
 
     async def step(self):
         # Small hack to let all the logs to be printed before prompting
-        await asleep(5.5)
+        await asleep(0.5)
         user_input = await ainput(ConsoleAgent.cformat(self.config.prompt))
         if user_input.lower() in self.config.stop_words:
             self.agent.stop()

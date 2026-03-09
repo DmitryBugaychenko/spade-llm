@@ -76,7 +76,7 @@ class EmbeddingsModelConfiguration(LlmConfiguration):
 
 class ModelsProvider(metaclass=ABCMeta):
     @abstractmethod
-    def create_chat_model(self, name):
+    def create_chat_model(self, name) -> BaseChatModel:
         """
         Lookups configuration with given name and creates chat model using it.
         :param name: Name of the chat model to lookup
@@ -85,7 +85,7 @@ class ModelsProvider(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def create_embeddings_model(self, name):
+    def create_embeddings_model(self, name) -> Embeddings:
         """
         Lookups configuration with given name and creates embeddings model using it.
         :param name: Name of the embeddings model to lookup

@@ -17,21 +17,21 @@ chat_models:
 # Tools available in the system
 tools:
   trigonometry_calculator:
-    type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryCalculatorToolFactory
+    type_name: spade_llm.demo.trigonometry.trigtoolkit.TrigonometryCalculatorToolFactory
     args:
-      type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryToolkit
+      type_name: spade_llm.demo.trigonometry.trigtoolkit.TrigonometryToolkit
       args:
         precision: 5
   german_precision_trigonometry_calculator:
-    type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryCalculatorToolFactory
+    type_name: spade_llm.demo.trigonometry.trigtoolkit.TrigonometryCalculatorToolFactory
     args:
-      type_name: spade_llm.demo.platform.trigonometry.trigtoolkit.TrigonometryToolkit
+      type_name: spade_llm.demo.trigonometry.trigtoolkit.TrigonometryToolkit
       args:
         precision: 14
 agents:
   # Simple react agent connected to LLM
   react:
-    type_name: spade_llm.core.react.ReactAgent
+    type_name: spade_llm.agents.react.ReactAgent
     args:
       # System prompt for the agent
       system_prompt: |

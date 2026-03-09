@@ -1,17 +1,14 @@
 import logging
-import os
 import unittest
 
-from langchain_gigachat import GigaChatEmbeddings
-
-from spade_llm import consts
-from spade_llm.agents.testing import DummyAgent, ExecuteInContext
-from spade_llm.core.api import AgentContext
+from spade_llm.agents.dummy import DummyAgent, ExecuteInContext
+from spade_llm.core.behaviors import MessageTemplate, ContextBehaviour
+from spade_llm.core.testing import TestPlatform, AgentEntry
 from spade_llm.patterns.discovery import AgentDescription, AgentTask, DirectoryFacilitatorAgent, AgentSearchRequest, \
-    AgentSearchResponse, DirectoryFacilitatorAgentConf, RegisterAgentBehaviour
-from tests.test_utils import TestPlatform, AgentEntry
+    AgentSearchResponse, DirectoryFacilitatorAgentConf
+from tests.base import ModelTestCase
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 DF_ADDRESS = "df"
 
 math = AgentDescription(
@@ -112,72 +109,59 @@ travel = AgentDescription(
     ]
 )
 
-class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.dummy_agent = DummyAgent("dummy")
 
-        self.df_agent = DirectoryFacilitatorAgent(agent_type=DF_ADDRESS)
 
-        embeddings = GigaChatEmbeddings(credentials=os.environ['GIGA_CRED'], verify_ssl_certs=False)
+class DiscoveryTest(ModelTestCase):
 
-        self.platform = TestPlatform(
+    def test_discovery_service(self):
+        dummy_agent = DummyAgent()
+
+        df_agent = DirectoryFacilitatorAgent(agent_type=DF_ADDRESS)
+
+        test = self
+
+        class RegisterAgent(ExecuteInContext):
+            def __init__(self, description: AgentDescription):
+                super().__init__()
+                self.description = description
+
+            async def execute(self, beh: ContextBehaviour):
+                with test.subTest("Test registration for " + self.description.id):
+                    await beh.context.inform(DF_ADDRESS).with_content(self.description)
+                    ack = await beh.receive(MessageTemplate.acknowledge(), 10)
+                    test.assertIsNotNone(ack)
+
+        class SearchFor(ExecuteInContext):
+            def __init__(self, query: str, expected: str):
+                self.expected = expected
+                self.query = query
+            async def execute(self, beh: ContextBehaviour):
+                await beh.context.request(DF_ADDRESS) \
+                    .with_content(AgentSearchRequest(task=self.query))
+                with test.subTest("Test search for " + self.expected):
+                    response = await beh.receive(MessageTemplate.inform(), 10)
+                    parsed = AgentSearchResponse.model_validate_json(response.content)
+
+                    test.assertEqual(len(parsed.agents), 1)
+                    test.assertEqual(parsed.agents[0].id, self.expected)
+
+        dummy_agent.as_agent(RegisterAgent(math))
+        dummy_agent.as_agent(RegisterAgent(search))
+        dummy_agent.as_agent(RegisterAgent(travel))
+        dummy_agent.as_agent(SearchFor("Solve a quadratic equation 2x^2 + x - 5 = 0", math.id))
+        dummy_agent.as_agent(SearchFor("When and who discovered antarctic continent?", search.id))
+        dummy_agent.as_agent(SearchFor("I would like to visit Belgium in may", travel.id))
+
+        TestPlatform.run_test(
             agents=[
                 AgentEntry(
-                    agent = self.df_agent,
+                    agent = df_agent,
                     configuration = DirectoryFacilitatorAgentConf(model="test")),
-                AgentEntry(agent=self.dummy_agent),
-            ],
-            wait_for={self.dummy_agent.agent_type},
-            embedding_models={"test" : embeddings}
+                AgentEntry(agent=dummy_agent),
+                ],
+            wait_for={dummy_agent.agent_type},
+            embedding_models={"test" : self.embeddings}
         )
-
-        await self.platform.start()
-        
-        class Register(ExecuteInContext):
-            async def execute(self, context: AgentContext):
-                await context.inform(DF_ADDRESS).with_content(math)
-                await context.inform(DF_ADDRESS).with_content(search)
-                await context.inform(DF_ADDRESS).with_content(travel)
-        
-        self.dummy_agent.as_agent(Register())
-        
-        # Wait for 3 ACKNOWLEDGE messages
-        for _ in range(3):
-            msg = self.dummy_agent.get_message(60)
-            self.assertIsNotNone(msg, "Expected ACKNOWLEDGE message not received")
-            self.assertEqual(msg.performative, consts.ACKNOWLEDGE)
-
-    async def asyncTearDown(self):
-        self.dummy_agent.stop()
-        await self.platform.stop()
-
-    def search_foragent(self, query: str) -> AgentSearchResponse:
-        class Send(ExecuteInContext):
-            async def execute(self, context: AgentContext):
-                await context.request(DF_ADDRESS) \
-                    .with_content(AgentSearchRequest(task=query))
-        
-        self.dummy_agent.as_agent(Send())
-        response_message = self.dummy_agent.get_message()
-        return AgentSearchResponse.model_validate_json(response_message.content)
-
-    def assertAgent(self, result: AgentSearchResponse, id: str):
-        self.assertListEqual([id], [x.id for x in result.agents])
-
-    def test_find_math(self):
-        result = self.search_foragent(
-            "Solve a quadratic equation 2x^2 + x - 5 = 0")
-        self.assertAgent(result, math.id)
-
-    def test_find_search(self):
-        result = self.search_foragent(
-            "When and who discovered antarctic continent?")
-        self.assertAgent(result, search.id)
-
-    def test_find_travel(self):
-        result = self.search_foragent(
-            "I would like to visit Belgium in may")
-        self.assertAgent(result, travel.id)
 
 
 if __name__ == '__main__':

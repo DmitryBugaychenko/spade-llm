@@ -76,7 +76,7 @@ class TestKafkaMessageSink(unittest.TestCase):
                 await sink.post_message(message)
 
                 # Wait for the message to propagate
-                await mock_sink.event.wait(timeout=60)
+                mock_sink.event.wait(timeout=60)
 
                 # Verify that the mock sink received the message
                 self.assertEqual(mock_sink.msg.sender, message.sender)
