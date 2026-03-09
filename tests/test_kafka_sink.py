@@ -25,7 +25,8 @@ class TestKafkaMessageSink(unittest.TestCase):
     def test_kafka_message_sink_send(self):
         logging.basicConfig(level=logging.DEBUG)
         """Test sending message via KafkaMessageSink."""
-        asyncio.run(self._run_async_test())
+        # asyncio.run(self._run_async_test())
+        self.fail("So far requires kafka broker setup locally")
 
     async def _run_async_test(self):
         # Define the agent type for the topic name
