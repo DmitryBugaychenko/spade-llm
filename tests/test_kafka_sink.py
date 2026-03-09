@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import socket
 import unittest
 from typing import Optional
 
@@ -22,11 +23,25 @@ class SingleMessageSink(MessageSink):
 
 class TestKafkaMessageSink(unittest.TestCase):
 
+    def is_port_open(self, host, port):
+        """Check if a port is open on a given host."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        try:
+            result = sock.connect_ex((host, port))
+            return result == 0
+        finally:
+            sock.close()
+
     def test_kafka_message_sink_send(self):
         logging.basicConfig(level=logging.DEBUG)
         """Test sending message via KafkaMessageSink."""
-        # asyncio.run(self._run_async_test())
-        self.fail("So far requires kafka broker setup locally")
+        
+        # Check if Kafka is available on localhost:9092
+        if not self.is_port_open('localhost', 9092):
+            self.skipTest("Kafka broker not available on localhost:9092")
+        
+        asyncio.run(self._run_async_test())
 
     async def _run_async_test(self):
         # Define the agent type for the topic name
@@ -61,10 +76,13 @@ class TestKafkaMessageSink(unittest.TestCase):
                 await sink.post_message(message)
 
                 # Wait for the message to propagate
-                mock_sink.event.wait(timeout=60)
+                await mock_sink.event.wait(timeout=60)
 
                 # Verify that the mock sink received the message
-                self.assertEqual(mock_sink.msg, message)
+                self.assertEqual(mock_sink.msg.sender, message.sender)
+                self.assertEqual(mock_sink.msg.receiver, message.receiver)
+                self.assertEqual(mock_sink.msg.performative, message.performative)
+                self.assertEqual(mock_sink.msg.content, message.content)
             finally:
                 source.stop()
                 await source.join()
