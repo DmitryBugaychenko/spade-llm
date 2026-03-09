@@ -3,7 +3,7 @@ import logging
 import os
 import unittest
 import uuid
-from typing import Optional
+from typing import Optional, Set
 
 from langchain_gigachat import GigaChatEmbeddings
 from pydantic import BaseModel
@@ -40,16 +40,20 @@ class MockTaskResult(BaseModel):
 class MockResponderAgent(Agent, ContractNetResponder):
     """A mock responder agent for testing contract net functionality."""
 
-    def __init__(self, agent_type: str, estimate_value: float):
+    def __init__(self, agent_type: str, estimate_value: float, supported_tasks: Set[str]):
         super().__init__(agent_type=agent_type)
         self.estimate_value = estimate_value
+        self.supported_tasks = supported_tasks
 
     async def estimate(self, request: ContractNetRequest, msg: MessageTemplate) -> Optional[ContractNetProposal]:
-        return ContractNetProposal(
-            author=self.agent_type,
-            request=request,
-            estimate=self.estimate_value,
-        )
+        # Return proposal only if task is supported
+        if request.task in self.supported_tasks:
+            return ContractNetProposal(
+                author=self.agent_type,
+                request=request,
+                estimate=self.estimate_value,
+            )
+        return None
 
     async def execute(self, proposal: ContractNetProposal, msg: MessageTemplate) -> BaseModel:
         return MockTaskResult(result=f"Executed by {self.agent_type}")
@@ -104,8 +108,23 @@ class ContractNetTest(unittest.TestCase):
         df_agent = DirectoryFacilitatorAgent(agent_type=DF_ADDRESS)
 
         # Create responder agents
-        spendings_agent = MockResponderAgent("spendings", 1.0)
-        transactions_agent = MockResponderAgent("transactions", 2.0)
+        # Spendings agent supports only spending analysis tasks
+        spendings_agent = MockResponderAgent(
+            "spendings", 
+            1.0, 
+            {"Analyze monthly spending patterns", "Identify categories with highest expenditure"}
+        )
+        # Transactions agent supports both tasks
+        transactions_agent = MockResponderAgent(
+            "transactions", 
+            2.0, 
+            {
+                "Analyze monthly spending patterns", 
+                "Identify categories with highest expenditure",
+                "Process transaction history",
+                "Filter transactions by date range"
+            }
+        )
 
         test = self
 
